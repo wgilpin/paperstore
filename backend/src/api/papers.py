@@ -89,6 +89,22 @@ def get_paper(
     return {"paper": _to_paper_detail(paper, note)}
 
 
+@router.delete("/{paper_id}", status_code=204)
+def delete_paper(
+    paper_id: str,
+    db: Session = Depends(get_session),
+) -> None:
+    paper = db.query(Paper).filter(Paper.id == paper_id).first()
+    if paper is None:
+        raise HTTPException(status_code=404, detail="Paper not found")
+    drive_file_id = paper.drive_file_id
+    db.query(Note).filter(Note.paper_id == paper.id).delete()
+    db.delete(paper)
+    db.commit()
+    from src.services.drive import DriveService
+    DriveService().delete(drive_file_id)
+
+
 @router.patch("/{paper_id}/note")
 def update_note(
     paper_id: str,

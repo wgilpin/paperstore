@@ -149,6 +149,30 @@ function initPaperPage() {
 
     document.getElementById('loading').hidden = true;
     document.getElementById('paper-content').hidden = false;
+
+    document.getElementById('delete-btn').addEventListener('click', () => deletePaper(paper.id, paper.title));
+  }
+
+  async function deletePaper(paperId, title) {
+    if (!confirm(`Delete "${title}" from your library and Drive?`)) return;
+    const btn = document.getElementById('delete-btn');
+    btn.disabled = true;
+    btn.textContent = 'Deleting…';
+    try {
+      const res = await fetch(`${API}/papers/${paperId}`, { method: 'DELETE' });
+      if (res.ok) {
+        location.href = '/';
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.detail || 'Delete failed.');
+        btn.disabled = false;
+        btn.textContent = 'Delete paper';
+      }
+    } catch {
+      alert('Network error — is the server running?');
+      btn.disabled = false;
+      btn.textContent = 'Delete paper';
+    }
   }
 
   async function saveNote(paperId, content) {

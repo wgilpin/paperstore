@@ -3,7 +3,7 @@
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import ARRAY, Index, String, Text, func
+from sqlalchemy import ARRAY, FetchedValue, Index, String, Text, func
 from sqlalchemy.dialects.postgresql import TSVECTOR, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -24,7 +24,7 @@ class Paper(Base):
     drive_view_url: Mapped[str] = mapped_column(Text, nullable=False)
     added_at: Mapped[datetime] = mapped_column(nullable=False, server_default=func.now())
     # search_vector is a GENERATED ALWAYS column — created by raw DDL in create_tables().
-    # Declared here so SQLAlchemy knows the column exists for query expressions.
-    search_vector: Mapped[str | None] = mapped_column(TSVECTOR, nullable=True)
+    # server_default=FetchedValue() tells SQLAlchemy the DB owns this column; never include in INSERT/UPDATE.
+    search_vector: Mapped[str | None] = mapped_column(TSVECTOR, nullable=True, server_default=FetchedValue())
 
     __table_args__ = (Index("idx_papers_search", "search_vector", postgresql_using="gin"),)

@@ -19,6 +19,10 @@
     #note-status { font-size: 0.8rem; color: #16a34a; min-height: 1.2em; margin-top: 0.3rem; }
     #loading { color: #999; }
     #error-msg { color: #dc2626; }
+    .danger-zone { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #e5e7eb; }
+    #delete-btn { background: none; border: 1px solid #dc2626; color: #dc2626; padding: 0.4rem 0.9rem; border-radius: 4px; font-size: 0.875rem; cursor: pointer; }
+    #delete-btn:hover { background: #dc2626; color: #fff; }
+    #delete-btn:disabled { opacity: 0.5; cursor: not-allowed; }
   </style>
 </head>
 <body>
@@ -34,6 +38,9 @@
     <label for="note-field">Notes</label>
     <textarea id="note-field" placeholder="Add your notes here…"></textarea>
     <div id="note-status"></div>
+    <div class="danger-zone">
+      <button id="delete-btn">Delete paper</button>
+    </div>
   </div>
 
   <script src="/static/app.js"></script>

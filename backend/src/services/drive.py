@@ -76,3 +76,11 @@ class DriveService:
             return DriveUploadResult(file_id=file_id, view_url=embed_url)
         except Exception as exc:
             raise DriveUploadError(str(exc)) from exc
+
+    def delete(self, file_id: str) -> None:
+        """Delete *file_id* from Drive. Silently ignores errors (best-effort)."""
+        try:
+            service = self._get_service()
+            service.files().delete(fileId=file_id).execute()
+        except Exception:
+            pass
