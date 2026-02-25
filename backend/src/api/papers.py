@@ -1,5 +1,7 @@
 """Papers API router."""
 
+from typing import Literal
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
@@ -59,9 +61,11 @@ def submit_paper(
 @router.get("", response_model=None)
 def list_papers(
     q: str | None = Query(default=None),
+    sort: Literal["added_at", "title"] = Query(default="added_at"),
+    page: int = Query(default=1, ge=1),
     db: Session = Depends(get_session),
 ) -> dict[str, list[PaperSummary] | int]:
-    papers = SearchService().search(q, db)
+    papers, total = SearchService().search(q, db, sort=sort, page=page)
     summaries = [
         PaperSummary(
             id=p.id,
@@ -73,7 +77,7 @@ def list_papers(
         )
         for p in papers
     ]
-    return {"papers": summaries, "total": len(summaries)}
+    return {"papers": summaries, "total": total}
 
 
 @router.get("/{paper_id}")

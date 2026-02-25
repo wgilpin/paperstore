@@ -31,11 +31,20 @@ function initIndexPage() {
   const addBtn = document.getElementById('add-btn');
   const addStatus = document.getElementById('add-status');
   const searchInput = document.getElementById('search-input');
+  const sortSelect = document.getElementById('sort-select');
   const paperList = document.getElementById('paper-list');
   const paperCount = document.getElementById('paper-count');
+  const pagination = document.getElementById('pagination');
+  const prevBtn = document.getElementById('prev-btn');
+  const nextBtn = document.getElementById('next-btn');
+  const pageInfo = document.getElementById('page-info');
+
+  const PAGE_SIZE = 20;
+  let currentPage = 1;
+  let totalPages = 1;
 
   // Load initial library
-  loadPapers('');
+  loadPapers();
 
   // Add paper form
   addForm.addEventListener('submit', async (e) => {
@@ -58,7 +67,8 @@ function initIndexPage() {
         addStatus.className = 'success';
         addStatus.textContent = `Added: "${data.paper.title}"`;
         urlInput.value = '';
-        loadPapers(searchInput.value);
+        currentPage = 1;
+        loadPapers();
       } else if (res.status === 409) {
         addStatus.className = 'error';
         addStatus.textContent = 'This paper is already in your library.';
@@ -74,30 +84,51 @@ function initIndexPage() {
     }
   });
 
-  // Search
-  searchInput.addEventListener('input', debounce((e) => {
-    loadPapers(e.target.value);
+  // Search — reset to page 1 on new query
+  searchInput.addEventListener('input', debounce(() => {
+    currentPage = 1;
+    loadPapers();
   }, 300));
 
-  async function loadPapers(query) {
-    const qs = query ? `?q=${encodeURIComponent(query)}` : '';
+  // Sort — reset to page 1
+  sortSelect.addEventListener('change', () => {
+    currentPage = 1;
+    loadPapers();
+  });
+
+  prevBtn.addEventListener('click', () => {
+    if (currentPage > 1) { currentPage--; loadPapers(); }
+  });
+
+  nextBtn.addEventListener('click', () => {
+    if (currentPage < totalPages) { currentPage++; loadPapers(); }
+  });
+
+  async function loadPapers() {
+    const query = searchInput.value.trim();
+    const sort = sortSelect.value;
+    const params = new URLSearchParams({ sort, page: String(currentPage) });
+    if (query) params.set('q', query);
+
     try {
-      const res = await fetch(`${API}/papers${qs}`);
+      const res = await fetch(`${API}/papers?${params}`);
       const data = await res.json();
-      renderPapers(data.papers, data.total);
+      renderPapers(data.papers, data.total, query);
     } catch {
       paperList.innerHTML = '<li class="no-results">Could not load papers.</li>';
     }
   }
 
-  function renderPapers(papers, total) {
-    const q = searchInput.value.trim();
-    paperCount.textContent = q
-      ? `${total} result${total !== 1 ? 's' : ''} for "${q}"`
+  function renderPapers(papers, total, query) {
+    paperCount.textContent = query
+      ? `${total} result${total !== 1 ? 's' : ''} for "${query}"`
       : `${total} paper${total !== 1 ? 's' : ''} in library`;
+
+    totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
     if (!papers || papers.length === 0) {
       paperList.innerHTML = '<li class="no-results">No papers found.</li>';
+      pagination.hidden = true;
       return;
     }
 
@@ -107,6 +138,11 @@ function initIndexPage() {
         <div class="paper-meta">${escapeHtml(formatAuthors(p.authors))}${p.published_date ? ' · ' + formatDate(p.published_date) : ''}</div>
       </li>
     `).join('');
+
+    pagination.hidden = totalPages <= 1;
+    pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+    prevBtn.disabled = currentPage <= 1;
+    nextBtn.disabled = currentPage >= totalPages;
   }
 }
 

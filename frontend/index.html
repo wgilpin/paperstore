@@ -15,14 +15,20 @@
     #add-status { margin-bottom: 1rem; font-size: 0.9rem; min-height: 1.2em; }
     #add-status.error { color: #dc2626; }
     #add-status.success { color: #16a34a; }
-    .search-bar { width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; margin-bottom: 1rem; }
-    #paper-count { font-size: 0.85rem; color: #666; margin-bottom: 0.75rem; }
+    .search-bar { width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; margin-bottom: 0.75rem; }
+    .list-controls { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; }
+    #paper-count { font-size: 0.85rem; color: #666; flex: 1; }
+    #sort-select { font-size: 0.85rem; padding: 0.25rem 0.5rem; border: 1px solid #ccc; border-radius: 4px; color: #444; }
     .paper-list { list-style: none; }
     .paper-item { padding: 0.75rem 0; border-bottom: 1px solid #eee; cursor: pointer; }
     .paper-item:hover { background: #f9fafb; }
     .paper-title { font-weight: 600; color: #2563eb; }
     .paper-meta { font-size: 0.85rem; color: #666; margin-top: 0.2rem; }
     .no-results { color: #999; font-style: italic; margin-top: 1rem; }
+    .pagination { display: flex; align-items: center; justify-content: center; gap: 1rem; margin-top: 1.25rem; }
+    .pagination button { padding: 0.35rem 0.9rem; border: 1px solid #ccc; border-radius: 4px; background: #fff; cursor: pointer; font-size: 0.9rem; }
+    .pagination button:disabled { opacity: 0.4; cursor: not-allowed; }
+    #page-info { font-size: 0.85rem; color: #555; }
   </style>
 </head>
 <body>
@@ -35,8 +41,23 @@
   <div id="add-status"></div>
 
   <input type="search" class="search-bar" id="search-input" placeholder="Search title, authors, abstract…" />
-  <div id="paper-count"></div>
+
+  <div class="list-controls">
+    <div id="paper-count"></div>
+    <label for="sort-select" style="font-size:0.85rem;color:#666;">Sort:</label>
+    <select id="sort-select">
+      <option value="added_at">Date Added</option>
+      <option value="title">Title</option>
+    </select>
+  </div>
+
   <ul class="paper-list" id="paper-list"></ul>
+
+  <div class="pagination" id="pagination" hidden>
+    <button id="prev-btn">&larr; Prev</button>
+    <span id="page-info"></span>
+    <button id="next-btn">Next &rarr;</button>
+  </div>
 
   <script src="/static/app.js"></script>
 </body>
