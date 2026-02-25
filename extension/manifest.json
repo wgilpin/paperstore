@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "PaperStore",
+  "version": "1.0.0",
+  "description": "One-click arXiv paper submission to your PaperStore library.",
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://arxiv.org/*",
+    "http://localhost:8000/*"
+  ],
+  "background": {
+    "service_worker": "service-worker.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://arxiv.org/*"],
+      "js": ["content.js"]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Add to PaperStore"
+  }
+}

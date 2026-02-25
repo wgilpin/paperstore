@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PaperStore</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      margin: 0;
+      padding: 16px;
+      width: 280px;
+      font-size: 14px;
+      color: #1a1a1a;
+    }
+    h1 {
+      font-size: 16px;
+      margin: 0 0 12px;
+    }
+    #status {
+      padding: 10px 12px;
+      border-radius: 6px;
+      background: #f3f4f6;
+      min-height: 36px;
+      line-height: 1.4;
+    }
+    #status.submitting { background: #eff6ff; color: #1d4ed8; }
+    #status.success    { background: #f0fdf4; color: #166534; }
+    #status.duplicate  { background: #fefce8; color: #854d0e; }
+    #status.error      { background: #fef2f2; color: #991b1b; }
+    button {
+      margin-top: 12px;
+      width: 100%;
+      padding: 8px;
+      border: none;
+      border-radius: 6px;
+      background: #2563eb;
+      color: white;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    button:disabled { background: #93c5fd; cursor: default; }
+  </style>
+</head>
+<body>
+  <h1>PaperStore</h1>
+  <div id="status">Ready to add this paper to your library.</div>
+  <button id="addBtn">Add Paper</button>
+
+  <script>
+    const statusEl = document.getElementById("status");
+    const addBtn = document.getElementById("addBtn");
+
+    function setStatus(cls, text) {
+      statusEl.className = cls;
+      statusEl.textContent = text;
+    }
+
+    addBtn.addEventListener("click", async () => {
+      addBtn.disabled = true;
+      setStatus("submitting", "Fetching arXiv ID…");
+
+      // Ask the content script for the arXiv ID of the current tab.
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+      let arxivId = null;
+      try {
+        const response = await chrome.tabs.sendMessage(tab.id, { type: "GET_ARXIV_ID" });
+        arxivId = response?.arxivId ?? null;
+      } catch {
+        // Content script not injected (non-arXiv page or first load).
+      }
+
+      if (!arxivId) {
+        setStatus("error", "No arXiv paper detected on this page.");
+        addBtn.disabled = false;
+        return;
+      }
+
+      setStatus("submitting", "Submitting to PaperStore…");
+
+      const result = await chrome.runtime.sendMessage({
+        type: "SUBMIT_PAPER",
+        arxivId,
+      });
+
+      if (result.status === "success") {
+        setStatus("success", "Paper added to your library!");
+      } else if (result.status === "duplicate") {
+        setStatus("duplicate", "This paper is already in your library.");
+      } else {
+        setStatus("error", `Error: ${result.message ?? "Unknown error"}`);
+        addBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

@@ -104,8 +104,8 @@ aligned with stated requirements.
 ## Technology Stack
 
 | Concern | Choice |
-|---------|--------|
-| Language | Python (latest stable) |
+| ------- | ------ |
+| Language | Python 3.11 |
 | Dependency manager | uv |
 | Typing enforcement | mypy (strict mode recommended) |
 | Linter/formatter | ruff |
