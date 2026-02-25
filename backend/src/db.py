@@ -2,7 +2,7 @@
 
 import os
 
-from sqlalchemy import Engine, create_engine
+from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 
@@ -43,5 +43,52 @@ def get_session() -> Session:
 
 
 def create_tables() -> None:
-    """Create all tables (idempotent — skips existing tables)."""
-    Base.metadata.create_all(bind=_get_engine())
+    """Create all tables and ensure search_vector is a generated column."""
+    engine = _get_engine()
+    Base.metadata.create_all(bind=engine)
+
+    # Ensure search_vector is a GENERATED ALWAYS AS stored column.
+    # create_all() creates it as a plain nullable TSVECTOR; we need to replace it.
+    # This is idempotent: if it's already generated, the DO block exits early.
+    _fix_search_vector_sql = """
+    DO $$
+    BEGIN
+        -- Drop and re-add search_vector only if it is not already a generated column.
+        IF EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name = 'papers'
+              AND column_name = 'search_vector'
+        ) AND NOT EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name = 'papers'
+              AND column_name = 'search_vector'
+              AND is_generated = 'ALWAYS'
+        ) THEN
+            ALTER TABLE papers DROP COLUMN search_vector;
+        END IF;
+
+        IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name = 'papers'
+              AND column_name = 'search_vector'
+        ) THEN
+            ALTER TABLE papers
+                ADD COLUMN search_vector tsvector
+                GENERATED ALWAYS AS (
+                    setweight(to_tsvector('english', coalesce(title, '')), 'A') ||
+                    setweight(to_tsvector('english', coalesce(abstract, '')), 'B')
+                ) STORED;
+        END IF;
+
+        -- Ensure the GIN index exists.
+        IF NOT EXISTS (
+            SELECT 1 FROM pg_indexes
+            WHERE tablename = 'papers' AND indexname = 'idx_papers_search'
+        ) THEN
+            CREATE INDEX idx_papers_search ON papers USING gin(search_vector);
+        END IF;
+    END $$;
+    """
+    with engine.connect() as conn:
+        conn.execute(text(_fix_search_vector_sql))
+        conn.commit()

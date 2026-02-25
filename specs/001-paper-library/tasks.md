@@ -178,6 +178,21 @@ If a test cannot be written without a live remote API, omit the test entirely.
 
 ---
 
+## Phase 9: Google OAuth Web Flow (FR-000)
+
+**Purpose**: Implement the browser-based OAuth flow so users can authenticate via Google without manually generating a token. Required before Docker deployment is usable.
+
+> No backend service tests — OAuth endpoints are API-layer (excluded by constitution Principle III).
+
+- [x] T051 [P] Add `SESSION_SECRET` to `.env.example`; add `OAUTHLIB_INSECURE_TRANSPORT: "1"` to `docker-compose.yml` api service environment
+- [x] T052 Create `backend/src/api/auth.py`: `GET /auth/login` (build `Flow`, store state in signed session cookie, redirect to Google) and `GET /auth/callback` (verify state, call `flow.fetch_token()`, write `token.json`, redirect to `/`)
+- [x] T053 Update `backend/src/main.py`: add `AuthMiddleware` (checks token validity, redirects to `/auth/login` if unauthenticated, exempts `/auth/*`), add `SessionMiddleware` with `SESSION_SECRET`, register auth router at `/auth`
+- [x] T054 Update `specs/001-paper-library/contracts/api.md` with `/auth/login` and `/auth/callback` endpoint contracts
+
+**Checkpoint**: `docker compose up --build`; navigate to `http://localhost:8000` → redirected to Google sign-in → after auth, redirected back to app.
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies

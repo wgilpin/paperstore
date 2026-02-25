@@ -140,7 +140,8 @@ function initPaperPage() {
     document.getElementById('paper-authors').textContent = formatAuthors(paper.authors);
     document.getElementById('paper-date').textContent = paper.published_date ? formatDate(paper.published_date) : '';
     document.getElementById('paper-abstract').textContent = paper.abstract || '';
-    document.getElementById('pdf-frame').src = `${API}/papers/${paper.id}/pdf`;
+    const embedUrl = paper.drive_view_url.replace(/\/view(\?.*)?$/, '/preview');
+    document.getElementById('pdf-frame').src = embedUrl;
 
     const noteField = document.getElementById('note-field');
     noteField.value = paper.note ? paper.note.content : '';

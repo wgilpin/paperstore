@@ -6,13 +6,14 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 WORKDIR /app
 
 # Copy dependency files first for layer caching
-COPY pyproject.toml uv.lock ./
+COPY backend/pyproject.toml backend/uv.lock ./
 
 # Install production dependencies only (no dev group)
 RUN uv sync --frozen --no-dev
 
-# Copy application source
-COPY src/ ./src/
+# Copy application source and frontend
+COPY backend/src/ ./src/
+COPY frontend/ ../frontend/
 
 # Expose the API port
 EXPOSE 8000

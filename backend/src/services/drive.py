@@ -19,13 +19,19 @@ class DriveService:
     """Uploads PDFs to Google Drive using the authenticated user's account."""
 
     def __init__(self) -> None:
-        self._service: Any = self._build_service()
+        self._service: Any = None
 
-    @staticmethod
-    def _build_service() -> Any:
-        token_path = os.environ.get("GOOGLE_TOKEN_PATH", "token.json")
-        creds = Credentials.from_authorized_user_file(token_path)  # type: ignore[no-untyped-call]
-        return build("drive", "v3", credentials=creds)
+    def _get_service(self) -> Any:
+        if self._service is None:
+            token_path = os.environ.get("GOOGLE_TOKEN_PATH", "token.json")
+            if not os.path.exists(token_path):
+                raise DriveUploadError(
+                    f"Google OAuth token not found at {token_path}. "
+                    "Complete the OAuth flow first."
+                )
+            creds = Credentials.from_authorized_user_file(token_path)  # type: ignore[no-untyped-call]
+            self._service = build("drive", "v3", credentials=creds)
+        return self._service
 
     def upload(self, pdf_bytes: bytes, filename: str) -> DriveUploadResult:
         """Upload *pdf_bytes* to Drive as *filename*.
@@ -34,6 +40,7 @@ class DriveService:
         Raises DriveUploadError on failure.
         """
         try:
+            service = self._get_service()
             media = MediaIoBaseUpload(
                 io.BytesIO(pdf_bytes),
                 mimetype="application/pdf",
@@ -44,7 +51,7 @@ class DriveService:
                 "mimeType": "application/pdf",
             }
             created = (
-                self._service.files()
+                service.files()
                 .create(
                     body=file_metadata,
                     media_body=media,
@@ -54,14 +61,15 @@ class DriveService:
                 .execute()
             )
             file_id: str = created["id"]
-            view_url: str = created["webViewLink"]
 
             # Make the file readable by anyone with the link.
-            self._service.permissions().create(
+            service.permissions().create(
                 fileId=file_id,
                 body={"type": "anyone", "role": "reader"},
             ).execute()
 
-            return DriveUploadResult(file_id=file_id, view_url=view_url)
+            # Use the /preview URL — it embeds cleanly in iframes unlike /view.
+            embed_url = f"https://drive.google.com/file/d/{file_id}/preview"
+            return DriveUploadResult(file_id=file_id, view_url=embed_url)
         except Exception as exc:
             raise DriveUploadError(str(exc)) from exc

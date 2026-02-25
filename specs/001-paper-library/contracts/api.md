@@ -62,6 +62,33 @@ Returned when viewing a single paper.
 
 ## Endpoints
 
+### GET /auth/login
+
+Initiates the Google OAuth 2.0 web flow.
+
+**Success — 302 Redirect** → Google OAuth consent screen URL.
+
+No request body or parameters required. Stores a CSRF `state` value in a signed session cookie before redirecting.
+
+---
+
+### GET /auth/callback
+
+OAuth redirect endpoint. Exchanges the authorization code for a token and persists it.
+
+**Query parameters** (supplied by Google, not the caller):
+
+| Parameter | Type | Description |
+| --------- | ---- | ----------- |
+| `code` | string | Authorization code from Google |
+| `state` | string | CSRF state value to verify against session |
+
+**Success — 302 Redirect** → `/` (app root). Token written to `GOOGLE_TOKEN_PATH`.
+
+**Error**: If state is mismatched or token exchange fails, raises an unhandled exception (returns 500). In a production system this would return a 400; for a prototype the crash surface is acceptable.
+
+---
+
 ### POST /papers
 
 Submit a URL to add a paper to the library.
