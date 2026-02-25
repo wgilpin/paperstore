@@ -31,7 +31,15 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+- [ ] **Python + uv**: Implementation uses Python; `uv` manages dependencies; `pyproject.toml` exists.
+- [ ] **Simplicity**: No features added beyond the spec; no speculative abstractions.
+- [ ] **TDD scope**: Backend service tests are planned (TDD); frontend/API endpoint tests are excluded.
+- [ ] **No remote API in tests**: All external dependencies in tests are mocked; no live LLM/API calls.
+- [ ] **Strong typing**: All function signatures typed; no plain `dict` args/returns; no `Any`; mypy passes.
+- [ ] **Ruff**: All code passes `ruff check` and `ruff format`.
+- [ ] **PostgreSQL**: Storage uses PostgreSQL only; no other database introduced.
+- [ ] **Docker Compose**: Full environment runnable via `docker compose up`.
+- [ ] **Approval gate**: No new features added that were not explicitly requested.
 
 ## Project Structure
 
