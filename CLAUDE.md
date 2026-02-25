@@ -5,6 +5,7 @@
 - **OS**: Windows 11, developed in Git Bash
 - **Shell**: Always use Unix shell syntax (forward slashes, `/dev/null`, not `NUL`)
 - **File paths**: Use forward slashes in all commands and scripts (e.g., `src/models/foo.py`)
+- **Python version**: 3.11
 - **Python toolchain**: `uv` only — never use `pip`, `pip-tools`, or `poetry` directly
 
 ## Constitution
@@ -36,3 +37,11 @@ Use the speckit commands in order:
 Follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
 Do not mention Claude or co-authors in commit messages.
 Describe changes, not motivation or benefits.
+
+## Recent Changes
+- 001-paper-library: Added Python 3.11 + FastAPI + Uvicorn (web framework), SQLAlchemy + Alembic (ORM + migrations),
+- 001-paper-library: Added [if applicable, e.g., PostgreSQL, CoreData, files or N/A]
+
+## Active Technologies
+- Python 3.11 + FastAPI + Uvicorn (web framework), SQLAlchemy + Alembic (ORM + migrations), (001-paper-library)
+- PostgreSQL (metadata + FTS via tsvector/GIN index); Google Drive (PDF files) (001-paper-library)
