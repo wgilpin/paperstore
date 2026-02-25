@@ -54,12 +54,12 @@ class IngestionService:
             metadata, pdf_bytes = self._pdf.download_and_extract(url)
 
         # Upload to Drive — raises DriveUploadError on failure.
+        title = metadata.get("title") or "Untitled"
+        safe_title = "".join(c if c.isalnum() or c in " -_" else "_" for c in title).strip()
         drive_result = self._drive.upload(
             pdf_bytes,
-            filename=f"{metadata.get('arxiv_id') or 'paper'}.pdf",
+            filename=f"{safe_title}.pdf",
         )
-
-        title = metadata.get("title") or "Untitled"
         paper = Paper(
             title=title,
             authors=metadata.get("authors") or [],

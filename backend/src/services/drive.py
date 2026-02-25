@@ -46,10 +46,13 @@ class DriveService:
                 mimetype="application/pdf",
                 resumable=False,
             )
-            file_metadata = {
+            folder_id = os.environ.get("DRIVE_FOLDER_ID", "").strip()
+            file_metadata: dict[str, object] = {
                 "name": filename,
                 "mimeType": "application/pdf",
             }
+            if folder_id:
+                file_metadata["parents"] = [folder_id]
             created = (
                 service.files()
                 .create(
