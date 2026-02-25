@@ -28,18 +28,30 @@ class PdfParser:
             raise ValueError(f"URL is not a PDF (content-type: {content_type!r})")
 
         pdf_bytes = response.content
-        metadata = self._extract_metadata(pdf_bytes)
+        metadata = self.extract_metadata(pdf_bytes)
         return metadata, pdf_bytes
 
-    def _extract_metadata(self, pdf_bytes: bytes) -> PaperMetadata:
+    def extract_metadata(self, pdf_bytes: bytes) -> PaperMetadata:
+        raw: dict[str, object] = {}
+        first_page_text: str = ""
         try:
             with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
                 raw = pdf.metadata or {}
+                if pdf.pages:
+                    first_page_text = pdf.pages[0].extract_text() or ""
         except Exception:
-            raw = {}
+            pass
 
-        title: str | None = raw.get("Title") or None
-        author_raw: str | None = raw.get("Author") or None
+        title: str | None = raw.get("Title") or None  # type: ignore[assignment]
+        if not title:
+            # Fall back to the first non-empty line of the first page.
+            for line in first_page_text.splitlines():
+                stripped = line.strip()
+                if stripped:
+                    title = stripped
+                    break
+
+        author_raw: str | None = raw.get("Author") or None  # type: ignore[assignment]
         authors = [a.strip() for a in author_raw.split(";")] if author_raw else []
 
         return PaperMetadata(

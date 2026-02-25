@@ -9,10 +9,16 @@ from src.services.pdf_parser import PdfParser
 _PDF_MAGIC = b"%PDF-1.4 fake content"
 
 
-def _make_pdfplumber_mock(metadata: dict[str, object]) -> MagicMock:
+def _make_pdfplumber_mock(
+    metadata: dict[str, object],
+    first_page_text: str = "",
+) -> MagicMock:
     """Return a mock that works as a context manager yielding a pdf with given metadata."""
+    page = MagicMock()
+    page.extract_text.return_value = first_page_text
     inner = MagicMock()
     inner.metadata = metadata
+    inner.pages = [page]
     ctx = MagicMock()
     ctx.__enter__ = MagicMock(return_value=inner)
     ctx.__exit__ = MagicMock(return_value=False)
@@ -65,13 +71,32 @@ class TestPdfParserDownloadAndExtract:
             with pytest.raises(Exception, match="404"):
                 parser.download_and_extract("https://example.com/missing.pdf")
 
-    def test_handles_missing_pdf_metadata_gracefully(self) -> None:
+    def test_falls_back_to_first_page_text_when_no_metadata_title(self) -> None:
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.headers = {"content-type": "application/pdf"}
         mock_response.content = _PDF_MAGIC
 
-        mock_ctx = _make_pdfplumber_mock({})  # no metadata fields
+        mock_ctx = _make_pdfplumber_mock({}, first_page_text="Attention Is All You Need\nAuthors...")
+
+        with (
+            patch("src.services.pdf_parser.httpx.get", return_value=mock_response),
+            patch("src.services.pdf_parser.pdfplumber.open", return_value=mock_ctx),
+        ):
+            parser = PdfParser()
+            metadata, _ = parser.download_and_extract("https://example.com/paper.pdf")
+
+        assert metadata["title"] == "Attention Is All You Need"
+        assert metadata["authors"] == []
+        assert metadata["abstract"] is None
+
+    def test_returns_none_title_when_no_metadata_and_no_page_text(self) -> None:
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.headers = {"content-type": "application/pdf"}
+        mock_response.content = _PDF_MAGIC
+
+        mock_ctx = _make_pdfplumber_mock({}, first_page_text="")
 
         with (
             patch("src.services.pdf_parser.httpx.get", return_value=mock_response),
@@ -82,4 +107,3 @@ class TestPdfParserDownloadAndExtract:
 
         assert metadata["title"] is None
         assert metadata["authors"] == []
-        assert metadata["abstract"] is None
