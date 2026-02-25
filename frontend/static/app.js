@@ -187,6 +187,80 @@ function initPaperPage() {
     document.getElementById('paper-content').hidden = false;
 
     document.getElementById('delete-btn').addEventListener('click', () => deletePaper(paper.id, paper.title));
+    setupEditForm(paper);
+  }
+
+  function setupEditForm(paper) {
+    const editBtn = document.getElementById('edit-btn');
+    const editForm = document.getElementById('edit-form');
+    const cancelBtn = document.getElementById('cancel-btn');
+    const saveBtn = document.getElementById('save-btn');
+    const editStatus = document.getElementById('edit-status');
+    const editError = document.getElementById('edit-error');
+
+    editBtn.addEventListener('click', () => {
+      document.getElementById('edit-title').value = paper.title;
+      document.getElementById('edit-authors').value = paper.authors.join(', ');
+      document.getElementById('edit-date').value = paper.published_date || '';
+      document.getElementById('edit-abstract').value = paper.abstract || '';
+      editStatus.textContent = '';
+      editError.textContent = '';
+      editForm.classList.add('visible');
+      editBtn.style.display = 'none';
+    });
+
+    cancelBtn.addEventListener('click', () => {
+      editForm.classList.remove('visible');
+      editBtn.style.display = '';
+    });
+
+    saveBtn.addEventListener('click', async () => {
+      saveBtn.disabled = true;
+      editStatus.textContent = '';
+      editError.textContent = '';
+
+      const title = document.getElementById('edit-title').value.trim();
+      const authorsRaw = document.getElementById('edit-authors').value;
+      const authors = authorsRaw.split(',').map((a) => a.trim()).filter(Boolean);
+      const published_date = document.getElementById('edit-date').value || null;
+      const abstract = document.getElementById('edit-abstract').value.trim() || null;
+
+      if (!title) { editError.textContent = 'Title is required.'; saveBtn.disabled = false; return; }
+
+      try {
+        const res = await fetch(`${API}/papers/${paper.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title, authors, published_date, abstract }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const updated = data.paper;
+          paper.title = updated.title;
+          paper.authors = updated.authors;
+          paper.published_date = updated.published_date;
+          paper.abstract = updated.abstract;
+          document.title = `${updated.title} — PaperStore`;
+          document.getElementById('paper-title').textContent = updated.title;
+          document.getElementById('paper-authors').textContent = formatAuthors(updated.authors);
+          document.getElementById('paper-date').textContent = updated.published_date ? formatDate(updated.published_date) : '';
+          document.getElementById('paper-abstract').textContent = updated.abstract || '';
+          editStatus.textContent = 'Saved';
+          setTimeout(() => {
+            editForm.classList.remove('visible');
+            editBtn.style.display = '';
+            editStatus.textContent = '';
+          }, 800);
+        } else {
+          const data = await res.json().catch(() => ({}));
+          editError.textContent = data.detail || 'Save failed.';
+        }
+      } catch {
+        editError.textContent = 'Network error — is the server running?';
+      } finally {
+        saveBtn.disabled = false;
+      }
+    });
   }
 
   async function deletePaper(paperId, title) {

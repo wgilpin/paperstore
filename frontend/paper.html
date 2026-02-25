@@ -23,6 +23,22 @@
     #delete-btn { background: none; border: 1px solid #dc2626; color: #dc2626; padding: 0.4rem 0.9rem; border-radius: 4px; font-size: 0.875rem; cursor: pointer; }
     #delete-btn:hover { background: #dc2626; color: #fff; }
     #delete-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    #edit-btn { background: none; border: 1px solid #2563eb; color: #2563eb; padding: 0.4rem 0.9rem; border-radius: 4px; font-size: 0.875rem; cursor: pointer; margin-bottom: 1rem; }
+    #edit-btn:hover { background: #2563eb; color: #fff; }
+    #edit-form { display: none; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 1rem; margin-bottom: 1.5rem; }
+    #edit-form.visible { display: block; }
+    .edit-field { margin-bottom: 0.75rem; }
+    .edit-field label { font-weight: 600; font-size: 0.875rem; display: block; margin-bottom: 0.25rem; }
+    .edit-field input, .edit-field textarea { width: 100%; padding: 0.4rem 0.6rem; border: 1px solid #ccc; border-radius: 4px; font-size: 0.95rem; font-family: inherit; }
+    .edit-field textarea { height: 100px; resize: vertical; }
+    .edit-actions { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
+    #save-btn { background: #2563eb; color: #fff; border: none; padding: 0.4rem 0.9rem; border-radius: 4px; font-size: 0.875rem; cursor: pointer; }
+    #save-btn:hover { background: #1d4ed8; }
+    #save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    #cancel-btn { background: none; border: 1px solid #6b7280; color: #6b7280; padding: 0.4rem 0.9rem; border-radius: 4px; font-size: 0.875rem; cursor: pointer; }
+    #cancel-btn:hover { background: #6b7280; color: #fff; }
+    #edit-status { font-size: 0.8rem; color: #16a34a; min-height: 1.2em; margin-top: 0.3rem; }
+    #edit-error { font-size: 0.8rem; color: #dc2626; min-height: 1.2em; margin-top: 0.3rem; }
   </style>
 </head>
 <body>
@@ -34,6 +50,31 @@
     <div class="authors" id="paper-authors"></div>
     <div class="date" id="paper-date"></div>
     <p class="abstract" id="paper-abstract"></p>
+    <button id="edit-btn">Edit</button>
+    <div id="edit-form">
+      <div class="edit-field">
+        <label for="edit-title">Title</label>
+        <input id="edit-title" type="text" />
+      </div>
+      <div class="edit-field">
+        <label for="edit-authors">Authors <span style="font-weight:normal;color:#6b7280">(comma-separated)</span></label>
+        <input id="edit-authors" type="text" />
+      </div>
+      <div class="edit-field">
+        <label for="edit-date">Published date</label>
+        <input id="edit-date" type="date" />
+      </div>
+      <div class="edit-field">
+        <label for="edit-abstract">Abstract</label>
+        <textarea id="edit-abstract"></textarea>
+      </div>
+      <div class="edit-actions">
+        <button id="save-btn">Save</button>
+        <button id="cancel-btn">Cancel</button>
+      </div>
+      <div id="edit-status"></div>
+      <div id="edit-error"></div>
+    </div>
     <iframe class="pdf-viewer" id="pdf-frame" title="Paper PDF"></iframe>
     <label for="note-field">Notes</label>
     <textarea id="note-field" placeholder="Add your notes here…"></textarea>

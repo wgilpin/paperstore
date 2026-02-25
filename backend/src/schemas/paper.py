@@ -41,6 +41,13 @@ class PaperDetail(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class PaperUpdateRequest(BaseModel):
+    title: str
+    authors: list[str]
+    published_date: date | None
+    abstract: str | None
+
+
 class ErrorResponse(BaseModel):
     error: str
     detail: str | None = None

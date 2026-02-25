@@ -15,6 +15,7 @@ from src.schemas.paper import (
     PaperDetail,
     PaperSubmitRequest,
     PaperSummary,
+    PaperUpdateRequest,
 )
 from src.services.drive import DriveUploadError
 from src.services.ingestion import DuplicateError, IngestionService
@@ -88,6 +89,26 @@ def get_paper(
     paper = db.query(Paper).filter(Paper.id == paper_id).first()
     if paper is None:
         raise HTTPException(status_code=404, detail="Paper not found")
+    note = db.query(Note).filter(Note.paper_id == paper.id).first()
+    assert note is not None
+    return {"paper": _to_paper_detail(paper, note)}
+
+
+@router.patch("/{paper_id}")
+def update_paper(
+    paper_id: str,
+    body: PaperUpdateRequest,
+    db: Session = Depends(get_session),
+) -> dict[str, PaperDetail]:
+    paper = db.query(Paper).filter(Paper.id == paper_id).first()
+    if paper is None:
+        raise HTTPException(status_code=404, detail="Paper not found")
+    paper.title = body.title
+    paper.authors = body.authors
+    paper.published_date = body.published_date
+    paper.abstract = body.abstract
+    db.commit()
+    db.refresh(paper)
     note = db.query(Note).filter(Note.paper_id == paper.id).first()
     assert note is not None
     return {"paper": _to_paper_detail(paper, note)}
