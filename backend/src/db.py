@@ -51,18 +51,15 @@ def create_tables() -> None:
     engine = _get_engine()
     Base.metadata.create_all(bind=engine)
 
-    # Ensure search_vector is a GENERATED ALWAYS AS stored column.
-    # create_all() creates it as a plain nullable TSVECTOR; we need to replace it.
-    # This is idempotent: if it's already generated, the DO block exits early.
+    # Maintain search_vector via a trigger (GENERATED ALWAYS AS cannot use
+    # array_to_string, which is STABLE not IMMUTABLE).
+    # This is idempotent: safe to run on every startup.
     _fix_search_vector_sql = """
     DO $$
     BEGIN
-        -- Drop and re-add search_vector only if it is not already a generated column.
+        -- If search_vector is still a generated column from an old migration, drop it
+        -- so we can recreate it as a plain column owned by the trigger.
         IF EXISTS (
-            SELECT 1 FROM information_schema.columns
-            WHERE table_name = 'papers'
-              AND column_name = 'search_vector'
-        ) AND NOT EXISTS (
             SELECT 1 FROM information_schema.columns
             WHERE table_name = 'papers'
               AND column_name = 'search_vector'
@@ -71,27 +68,51 @@ def create_tables() -> None:
             ALTER TABLE papers DROP COLUMN search_vector;
         END IF;
 
+        -- Add as a plain tsvector column if absent.
         IF NOT EXISTS (
             SELECT 1 FROM information_schema.columns
-            WHERE table_name = 'papers'
-              AND column_name = 'search_vector'
+            WHERE table_name = 'papers' AND column_name = 'search_vector'
         ) THEN
-            ALTER TABLE papers
-                ADD COLUMN search_vector tsvector
-                GENERATED ALWAYS AS (
-                    setweight(to_tsvector('english', coalesce(title, '')), 'A') ||
-                    setweight(to_tsvector('english', coalesce(abstract, '')), 'B')
-                ) STORED;
+            ALTER TABLE papers ADD COLUMN search_vector tsvector;
         END IF;
 
-        -- Ensure the GIN index exists.
+        -- Ensure GIN index exists.
         IF NOT EXISTS (
             SELECT 1 FROM pg_indexes
             WHERE tablename = 'papers' AND indexname = 'idx_papers_search'
         ) THEN
             CREATE INDEX idx_papers_search ON papers USING gin(search_vector);
         END IF;
+
+        -- Create or replace the trigger function.
+        CREATE OR REPLACE FUNCTION papers_search_vector_update() RETURNS trigger AS $func$
+        BEGIN
+            NEW.search_vector :=
+                setweight(to_tsvector('english', coalesce(NEW.title, '')), 'A') ||
+                setweight(to_tsvector('english', coalesce(NEW.abstract, '')), 'B') ||
+                setweight(to_tsvector('simple',  coalesce(array_to_string(NEW.authors, ' '), '')), 'C');
+            RETURN NEW;
+        END;
+        $func$ LANGUAGE plpgsql;
+
+        -- Create trigger if absent.
+        IF NOT EXISTS (
+            SELECT 1 FROM pg_trigger
+            WHERE tgname = 'papers_search_vector_trigger'
+        ) THEN
+            CREATE TRIGGER papers_search_vector_trigger
+                BEFORE INSERT OR UPDATE ON papers
+                FOR EACH ROW EXECUTE FUNCTION papers_search_vector_update();
+        END IF;
     END $$;
+
+    -- Backfill existing rows that have a NULL search_vector.
+    UPDATE papers
+       SET search_vector =
+               setweight(to_tsvector('english', coalesce(title, '')), 'A') ||
+               setweight(to_tsvector('english', coalesce(abstract, '')), 'B') ||
+               setweight(to_tsvector('simple',  coalesce(array_to_string(authors, ' '), '')), 'C')
+     WHERE search_vector IS NULL;
     """
     with engine.connect() as conn:
         conn.execute(text(_fix_search_vector_sql))
