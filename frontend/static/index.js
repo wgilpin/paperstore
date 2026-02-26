@@ -216,16 +216,23 @@ function initIndexPage() {
 
     paperList.innerHTML = papers.map((p) => {
       const tagsHtml = p.tags && p.tags.length
-        ? `<div class="paper-tags">${p.tags.map((t) => `<span class="tag-chip">${escapeHtml(t)}</span>`).join('')}</div>`
+        ? `<div class="paper-tags">${p.tags.map((t) => `<span class="tag-chip" data-tag="${escapeHtml(t)}">${escapeHtml(t)}</span>`).join('')}</div>`
         : '';
       return `
-        <li class="paper-item" onclick="location.href='paper.html?id=${p.id}'">
+        <li class="paper-item" data-id="${p.id}">
           <div class="paper-title">${escapeHtml(p.title)}</div>
           <div class="paper-meta">${escapeHtml(formatAuthors(p.authors))}${p.published_date ? ' · ' + formatDate(p.published_date) : ''}</div>
           ${tagsHtml}
         </li>
       `;
     }).join('');
+
+    paperList.onclick = (e) => {
+      const chip = e.target.closest('.tag-chip');
+      if (chip) { selectTag(chip.dataset.tag); return; }
+      const item = e.target.closest('.paper-item');
+      if (item) location.href = `paper.html?id=${item.dataset.id}`;
+    };
 
     pagination.hidden = totalPages <= 1;
     pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
