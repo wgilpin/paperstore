@@ -24,10 +24,20 @@
     .paper-item:hover { background: #f9fafb; }
     .paper-title { font-weight: 600; color: #2563eb; }
     .paper-meta { font-size: 0.85rem; color: #666; margin-top: 0.2rem; }
-    .tag-filter { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.75rem; }
-    .tag-pill { padding: 0.2rem 0.65rem; border: 1px solid #ccc; border-radius: 999px; background: #f3f4f6; font-size: 0.78rem; cursor: pointer; color: #444; user-select: none; }
+    .tag-filter { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.75rem; }
+    .tag-pills-row { display: flex; gap: 0.4rem; overflow: hidden; flex-shrink: 1; min-width: 0; }
+    .tag-pill { padding: 0.2rem 0.65rem; border: 1px solid #ccc; border-radius: 999px; background: #f3f4f6; font-size: 0.78rem; cursor: pointer; color: #444; user-select: none; white-space: nowrap; flex-shrink: 0; }
     .tag-pill:hover { background: #e5e7eb; }
     .tag-pill.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+    .tag-autocomplete-wrap { position: relative; flex-shrink: 0; }
+    .tag-autocomplete-wrap input { padding: 0.2rem 0.6rem; border: 1px solid #ccc; border-radius: 999px; font-size: 0.78rem; color: #444; width: 130px; outline: none; background: #f3f4f6; }
+    .tag-autocomplete-wrap input:focus { border-color: #2563eb; background: #fff; }
+    .tag-autocomplete-wrap input.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+    .tag-autocomplete-wrap input.active::placeholder { color: rgba(255,255,255,0.8); }
+    .tag-dropdown { position: absolute; top: calc(100% + 2px); left: 0; background: #fff; border: 1px solid #ccc; border-radius: 6px; max-height: 200px; overflow-y: auto; z-index: 20; min-width: 160px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
+    .tag-dropdown div { padding: 0.3rem 0.65rem; font-size: 0.82rem; cursor: pointer; white-space: nowrap; }
+    .tag-dropdown div:hover, .tag-dropdown div.highlighted { background: #eff6ff; }
+    .tag-dropdown div.active { color: #2563eb; font-weight: 600; }
     .paper-tags { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.35rem; }
     .tag-chip { padding: 0.1rem 0.5rem; border-radius: 999px; background: #e0e7ff; color: #3730a3; font-size: 0.75rem; }
     .no-results { color: #999; font-style: italic; margin-top: 1rem; }
@@ -57,7 +67,13 @@
     </select>
   </div>
 
-  <div class="tag-filter" id="tag-filter" hidden></div>
+  <div class="tag-filter" id="tag-filter" hidden>
+    <div class="tag-pills-row" id="tag-pills-row"></div>
+    <div class="tag-autocomplete-wrap" id="tag-autocomplete-wrap">
+      <input type="text" id="tag-autocomplete" placeholder="More tags…" autocomplete="off" />
+      <div class="tag-dropdown" id="tag-dropdown" hidden></div>
+    </div>
+  </div>
 
   <ul class="paper-list" id="paper-list"></ul>
 
@@ -67,6 +83,7 @@
     <button id="next-btn">Next &rarr;</button>
   </div>
 
-  <script src="/static/app.js"></script>
+  <script src="/static/utils.js"></script>
+  <script src="/static/index.js"></script>
 </body>
 </html>

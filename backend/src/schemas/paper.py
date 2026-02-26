@@ -3,7 +3,7 @@
 import uuid
 from datetime import date, datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class PaperSubmitRequest(BaseModel):
@@ -49,6 +49,21 @@ class PaperUpdateRequest(BaseModel):
     published_date: date | None
     abstract: str | None
     tags: list[str] = Field(default_factory=list)
+
+    @field_validator("published_date", mode="before")
+    @classmethod
+    def parse_partial_date(cls, v: object) -> date | None:
+        if v is None or v == "":
+            return None
+        if isinstance(v, date):
+            return v
+        s = str(v).strip()
+        parts = s.split("-")
+        if len(parts) == 1:
+            return date(int(parts[0]), 1, 1)
+        if len(parts) == 2:
+            return date(int(parts[0]), int(parts[1]), 1)
+        return date.fromisoformat(s)
 
 
 class ErrorResponse(BaseModel):

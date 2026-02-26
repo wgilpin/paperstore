@@ -86,8 +86,8 @@
         <input id="edit-authors" type="text" />
       </div>
       <div class="edit-field">
-        <label for="edit-date">Published date</label>
-        <input id="edit-date" type="date" />
+        <label for="edit-date">Published date <span style="font-weight:normal;color:#6b7280">(e.g. 2017 or 2017-06 or 2017-06-15)</span></label>
+        <input id="edit-date" type="text" placeholder="YYYY or YYYY-MM or YYYY-MM-DD" />
       </div>
       <div class="edit-field">
         <label for="edit-abstract">Abstract</label>
@@ -109,6 +109,7 @@
     </div>
   </div>
 
-  <script src="/static/app.js"></script>
+  <script src="/static/utils.js"></script>
+  <script src="/static/paper.js"></script>
 </body>
 </html>
