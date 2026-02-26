@@ -257,6 +257,8 @@ function initPaperPage() {
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
           extractError.textContent = data.detail || 'Extraction failed.';
+          extractBtn.disabled = false;
+          extractBtn.textContent = 'Extract metadata';
           return;
         }
         const data = await res.json();
@@ -266,27 +268,26 @@ function initPaperPage() {
         const existingAuthors = paper.authors && paper.authors.length ? paper.authors.join(', ') : '';
         const llmAuthors = m.authors && m.authors.length ? m.authors.join(', ') : '';
         const acceptAllBtn = document.getElementById('accept-all-btn');
-        const pendingAccepts = [];  // list of () => void for each pending suggestion
+        const pendingReverts = [];  // list of () => void for each pending revert
 
         function applyField(inputId, suggestId, existing, llmValue) {
           const input = document.getElementById(inputId);
           const suggest = document.getElementById(suggestId);
           suggest.classList.remove('visible');
           suggest.innerHTML = '';
-          if (!existing && llmValue) {
-            // Empty field — fill silently
+          if (llmValue && llmValue !== existing) {
+            // Use new value, show old value with revert option
             input.value = llmValue;
-          } else if (existing && llmValue && llmValue !== existing) {
-            // Conflict — keep existing, show suggestion
-            input.value = existing;
-            const preview = llmValue.length > 80 ? llmValue.slice(0, 80) + '…' : llmValue;
-            suggest.innerHTML = `LLM suggested: <strong>${escapeHtml(preview)}</strong><button type="button">Use this</button>`;
-            suggest.classList.add('visible');
-            const accept = () => { input.value = llmValue; suggest.classList.remove('visible'); };
-            suggest.querySelector('button').addEventListener('click', accept);
-            pendingAccepts.push(accept);
+            if (existing) {
+              const preview = existing.length > 80 ? existing.slice(0, 80) + '…' : existing;
+              suggest.innerHTML = `Was: <strong>${escapeHtml(preview)}</strong> — <button type="button">Revert</button>`;
+              suggest.classList.add('visible');
+              const revert = () => { input.value = existing; suggest.classList.remove('visible'); };
+              suggest.querySelector('button').addEventListener('click', revert);
+              pendingReverts.push(revert);
+            }
           } else {
-            // Same value or no LLM value — just fill with existing
+            // No new value or same — keep existing
             input.value = existing || '';
           }
         }
@@ -296,10 +297,11 @@ function initPaperPage() {
         applyField('edit-date', 'suggest-date', paper.published_date || '', m.date || '');
         applyField('edit-abstract', 'suggest-abstract', paper.abstract || '', m.abstract || '');
 
-        if (pendingAccepts.length > 0) {
+        if (pendingReverts.length > 0) {
           acceptAllBtn.style.display = '';
+          acceptAllBtn.textContent = 'Revert all changes';
           acceptAllBtn.onclick = () => {
-            pendingAccepts.forEach((fn) => fn());
+            pendingReverts.forEach((fn) => fn());
             acceptAllBtn.style.display = 'none';
           };
         } else {
@@ -311,9 +313,9 @@ function initPaperPage() {
         editBtn.style.display = 'none';
 
         extractStatus.textContent = 'Review extracted metadata and save.';
+        extractBtn.textContent = 'Extracted';
       } catch {
         extractError.textContent = 'Network error — is the server running?';
-      } finally {
         extractBtn.disabled = false;
         extractBtn.textContent = 'Extract metadata';
       }
