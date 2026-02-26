@@ -6,6 +6,8 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from src.models.paper import Paper
+from src.models.paper_tag import paper_tags
+from src.models.tag import Tag
 
 SortField = Literal["added_at", "title"]
 
@@ -19,17 +21,25 @@ class SearchService:
         db: Session,
         sort: SortField = "added_at",
         page: int = 1,
+        tag: str | None = None,
     ) -> tuple[list[Paper], int]:
         """Return papers matching *query*, or all papers if query is empty.
 
         Returns (papers, total_count). When no query, sorts by *sort* field.
         When a query is present, sorts by relevance (ts_rank).
+        When *tag* is set, restricts results to papers with that tag name.
         """
         offset = (page - 1) * PAGE_SIZE
 
         if not query:
             order = Paper.added_at.desc() if sort == "added_at" else Paper.title.asc()
             base = db.query(Paper).order_by(order)
+            if tag:
+                base = (
+                    base.join(paper_tags, Paper.id == paper_tags.c.paper_id)
+                    .join(Tag, Tag.id == paper_tags.c.tag_id)
+                    .filter(Tag.name == tag)
+                )
             total: int = base.count()
             papers = base.offset(offset).limit(PAGE_SIZE).all()
             return papers, total
@@ -40,6 +50,12 @@ class SearchService:
             .filter(Paper.search_vector.op("@@")(tsquery))
             .order_by(func.ts_rank(Paper.search_vector, tsquery).desc())
         )
+        if tag:
+            base = (
+                base.join(paper_tags, Paper.id == paper_tags.c.paper_id)
+                .join(Tag, Tag.id == paper_tags.c.tag_id)
+                .filter(Tag.name == tag)
+            )
         total = base.count()
         papers = base.offset(offset).limit(PAGE_SIZE).all()
         return papers, total

@@ -21,6 +21,14 @@ function formatDate(dateStr) {
   return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 /* ── Index page ─────────────────────────────────────────────── */
 
 function initIndexPage() {
@@ -38,13 +46,43 @@ function initIndexPage() {
   const prevBtn = document.getElementById('prev-btn');
   const nextBtn = document.getElementById('next-btn');
   const pageInfo = document.getElementById('page-info');
+  const tagFilter = document.getElementById('tag-filter');
 
   const PAGE_SIZE = 20;
   let currentPage = 1;
   let totalPages = 1;
+  let activeTag = null;
 
-  // Load initial library
-  loadPapers();
+  // Load tags for filter bar, then load papers
+  loadTags().then(() => loadPapers());
+
+  async function loadTags() {
+    try {
+      const res = await fetch(`${API}/tags`);
+      const data = await res.json();
+      renderTagFilter(data.tags || []);
+    } catch {
+      // Non-fatal — tag filter just stays hidden
+    }
+  }
+
+  function renderTagFilter(tags) {
+    if (!tags.length) { tagFilter.hidden = true; return; }
+    tagFilter.hidden = false;
+    const allPill = `<button class="tag-pill${activeTag === null ? ' active' : ''}" data-tag="">All</button>`;
+    const pills = tags.map((t) =>
+      `<button class="tag-pill${activeTag === t ? ' active' : ''}" data-tag="${escapeHtml(t)}">${escapeHtml(t)}</button>`
+    ).join('');
+    tagFilter.innerHTML = allPill + pills;
+    tagFilter.querySelectorAll('.tag-pill').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        activeTag = btn.dataset.tag || null;
+        currentPage = 1;
+        loadTags();
+        loadPapers();
+      });
+    });
+  }
 
   // Add paper form
   addForm.addEventListener('submit', async (e) => {
@@ -68,6 +106,7 @@ function initIndexPage() {
         addStatus.textContent = `Added: "${data.paper.title}"`;
         urlInput.value = '';
         currentPage = 1;
+        loadTags();
         loadPapers();
       } else if (res.status === 409) {
         addStatus.className = 'error';
@@ -109,6 +148,7 @@ function initIndexPage() {
     const sort = sortSelect.value;
     const params = new URLSearchParams({ sort, page: String(currentPage) });
     if (query) params.set('q', query);
+    if (activeTag) params.set('tag', activeTag);
 
     try {
       const res = await fetch(`${API}/papers?${params}`);
@@ -132,12 +172,18 @@ function initIndexPage() {
       return;
     }
 
-    paperList.innerHTML = papers.map((p) => `
-      <li class="paper-item" onclick="location.href='paper.html?id=${p.id}'">
-        <div class="paper-title">${escapeHtml(p.title)}</div>
-        <div class="paper-meta">${escapeHtml(formatAuthors(p.authors))}${p.published_date ? ' · ' + formatDate(p.published_date) : ''}</div>
-      </li>
-    `).join('');
+    paperList.innerHTML = papers.map((p) => {
+      const tagsHtml = p.tags && p.tags.length
+        ? `<div class="paper-tags">${p.tags.map((t) => `<span class="tag-chip">${escapeHtml(t)}</span>`).join('')}</div>`
+        : '';
+      return `
+        <li class="paper-item" onclick="location.href='paper.html?id=${p.id}'">
+          <div class="paper-title">${escapeHtml(p.title)}</div>
+          <div class="paper-meta">${escapeHtml(formatAuthors(p.authors))}${p.published_date ? ' · ' + formatDate(p.published_date) : ''}</div>
+          ${tagsHtml}
+        </li>
+      `;
+    }).join('');
 
     pagination.hidden = totalPages <= 1;
     pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
@@ -156,18 +202,24 @@ function initPaperPage() {
   const id = params.get('id');
   if (!id) { showError('No paper ID in URL.'); return; }
 
+  let allTags = [];  // fetched from /tags for autocomplete
+
+  fetch(`${API}/tags`).then((r) => r.json()).then((d) => { allTags = d.tags || []; }).catch(() => {});
+
   loadPaper(id);
 
   async function loadPaper(paperId) {
+    let data;
     try {
       const res = await fetch(`${API}/papers/${paperId}`);
       if (res.status === 404) { showError('Paper not found.'); return; }
       if (!res.ok) { showError('Failed to load paper.'); return; }
-      const data = await res.json();
-      renderPaper(data.paper);
+      data = await res.json();
     } catch {
       showError('Network error — is the server running?');
+      return;
     }
+    renderPaper(data.paper);
   }
 
   function renderPaper(paper) {
@@ -187,7 +239,82 @@ function initPaperPage() {
     document.getElementById('paper-content').hidden = false;
 
     document.getElementById('delete-btn').addEventListener('click', () => deletePaper(paper.id, paper.title));
+    setupInlineTags(paper);
     setupEditForm(paper);
+  }
+
+  function setupInlineTags(paper) {
+    const tagInput = document.getElementById('inline-tag-input');
+    const tagSuggestions = document.getElementById('inline-tag-suggestions');
+
+    function renderTagChips() {
+      const container = document.getElementById('paper-tags');
+      if (!container) return;
+      const chips = (paper.tags || []).map((t) =>
+        `<span class="tag-chip">${escapeHtml(t)}<button type="button" data-tag="${escapeHtml(t)}" aria-label="Remove ${escapeHtml(t)}">×</button></span>`
+      ).join('');
+      container.innerHTML = chips;
+      container.querySelectorAll('button').forEach((btn) => {
+        btn.addEventListener('click', () => removeTag(btn.dataset.tag));
+      });
+    }
+
+    async function saveTags() {
+      try {
+        const res = await fetch(`${API}/papers/${paper.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: paper.title,
+            authors: paper.authors,
+            published_date: paper.published_date,
+            abstract: paper.abstract,
+            tags: paper.tags,
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          paper.tags = data.paper.tags || [];
+          fetch(`${API}/tags`).then((r) => r.json()).then((d) => { allTags = d.tags || []; }).catch(() => {});
+        }
+      } catch { /* silent */ }
+      renderTagChips();
+    }
+
+    function addTag(name) {
+      name = name.trim();
+      if (!name || (paper.tags || []).includes(name)) return;
+      paper.tags = [...(paper.tags || []), name];
+      tagInput.value = '';
+      tagSuggestions.hidden = true;
+      saveTags();
+    }
+
+    function removeTag(name) {
+      paper.tags = (paper.tags || []).filter((t) => t !== name);
+      saveTags();
+    }
+
+    function showSuggestions(val) {
+      if (!val) { tagSuggestions.hidden = true; return; }
+      const matches = allTags.filter((t) => t.toLowerCase().includes(val.toLowerCase()) && !(paper.tags || []).includes(t));
+      if (!matches.length) { tagSuggestions.hidden = true; return; }
+      tagSuggestions.hidden = false;
+      tagSuggestions.innerHTML = matches.map((t) =>
+        `<div data-tag="${escapeHtml(t)}">${escapeHtml(t)}</div>`
+      ).join('');
+      tagSuggestions.querySelectorAll('div').forEach((el) => {
+        el.addEventListener('mousedown', (e) => { e.preventDefault(); addTag(el.dataset.tag); });
+      });
+    }
+
+    tagInput.addEventListener('input', () => showSuggestions(tagInput.value));
+    tagInput.addEventListener('blur', () => { setTimeout(() => { tagSuggestions.hidden = true; }, 150); });
+    tagInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); addTag(tagInput.value); }
+    });
+
+    renderTagChips();
   }
 
   function setupEditForm(paper) {
@@ -231,7 +358,7 @@ function initPaperPage() {
         const res = await fetch(`${API}/papers/${paper.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title, authors, published_date, abstract }),
+          body: JSON.stringify({ title, authors, published_date, abstract, tags: paper.tags || [] }),
         });
         if (res.ok) {
           const data = await res.json();
@@ -308,14 +435,6 @@ function showError(msg) {
   document.getElementById('loading').hidden = true;
   const err = document.getElementById('error-msg');
   if (err) { err.hidden = false; err.textContent = msg; }
-}
-
-function escapeHtml(str) {
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
 }
 
 /* ── Bootstrap ──────────────────────────────────────────────── */

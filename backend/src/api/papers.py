@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from src.db import get_session
 from src.models.note import Note
 from src.models.paper import Paper
+from src.models.tag import Tag
 from src.schemas.note import NoteResponse, NoteUpdateRequest
 from src.schemas.paper import (
     NoteSchema,
@@ -24,6 +25,10 @@ from src.services.search import SearchService
 router = APIRouter()
 
 
+def _tag_names(paper: Paper) -> list[str]:
+    return sorted(t.name for t in (paper.tags or []))
+
+
 def _to_paper_detail(paper: Paper, note: Note) -> PaperDetail:
     return PaperDetail(
         id=paper.id,
@@ -36,6 +41,7 @@ def _to_paper_detail(paper: Paper, note: Note) -> PaperDetail:
         drive_view_url=paper.drive_view_url,
         added_at=paper.added_at,
         note=NoteSchema(content=note.content, updated_at=note.updated_at),
+        tags=_tag_names(paper),
     )
 
 
@@ -64,9 +70,10 @@ def list_papers(
     q: str | None = Query(default=None),
     sort: Literal["added_at", "title"] = Query(default="added_at"),
     page: int = Query(default=1, ge=1),
+    tag: str | None = Query(default=None),
     db: Session = Depends(get_session),
 ) -> dict[str, list[PaperSummary] | int]:
-    papers, total = SearchService().search(q, db, sort=sort, page=page)
+    papers, total = SearchService().search(q, db, sort=sort, page=page, tag=tag)
     summaries = [
         PaperSummary(
             id=p.id,
@@ -75,6 +82,7 @@ def list_papers(
             authors=p.authors,
             published_date=p.published_date,
             added_at=p.added_at,
+            tags=_tag_names(p),
         )
         for p in papers
     ]
@@ -94,6 +102,22 @@ def get_paper(
     return {"paper": _to_paper_detail(paper, note)}
 
 
+def _sync_tags(paper: Paper, tag_names: list[str], db: Session) -> None:
+    """Replace paper.tags with the given list of tag names, creating new tags as needed."""
+    resolved: list[Tag] = []
+    for name in tag_names:
+        name = name.strip()
+        if not name:
+            continue
+        tag = db.query(Tag).filter(Tag.name == name).first()
+        if tag is None:
+            tag = Tag(name=name)
+            db.add(tag)
+            db.flush()
+        resolved.append(tag)
+    paper.tags = resolved
+
+
 @router.patch("/{paper_id}")
 def update_paper(
     paper_id: str,
@@ -107,6 +131,7 @@ def update_paper(
     paper.authors = body.authors
     paper.published_date = body.published_date
     paper.abstract = body.abstract
+    _sync_tags(paper, body.tags, db)
     db.commit()
     db.refresh(paper)
     note = db.query(Note).filter(Note.paper_id == paper.id).first()

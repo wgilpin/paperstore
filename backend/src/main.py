@@ -112,10 +112,11 @@ async def _global_exception_handler(request: Request, exc: Exception) -> JSONRes
 
 
 # Import and register routers after app is defined to avoid circular imports.
-from src.api import auth, papers  # noqa: E402
+from src.api import auth, papers, tags  # noqa: E402
 
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(papers.router, prefix="/papers", tags=["papers"])
+app.include_router(tags.router, prefix="/tags", tags=["tags"])
 
 # Serve the frontend if it exists (built later in the project).
 _frontend_dir = pathlib.Path(__file__).parent.parent.parent / "frontend"

@@ -22,6 +22,7 @@ class PaperSummary(BaseModel):
     authors: list[str]
     published_date: date | None
     added_at: datetime
+    tags: list[str]
 
     model_config = {"from_attributes": True}
 
@@ -37,6 +38,7 @@ class PaperDetail(BaseModel):
     drive_view_url: str
     added_at: datetime
     note: NoteSchema
+    tags: list[str]
 
     model_config = {"from_attributes": True}
 
@@ -46,6 +48,7 @@ class PaperUpdateRequest(BaseModel):
     authors: list[str]
     published_date: date | None
     abstract: str | None
+    tags: list[str] = Field(default_factory=list)
 
 
 class ErrorResponse(BaseModel):

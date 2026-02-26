@@ -43,5 +43,6 @@ Describe changes, not motivation or benefits.
 - 001-paper-library: Added [if applicable, e.g., PostgreSQL, CoreData, files or N/A]
 
 ## Active Technologies
-- Python 3.11 + FastAPI + Uvicorn (web framework), SQLAlchemy + Alembic (ORM + migrations), (001-paper-library)
+- Python 3.11 + FastAPI + Uvicorn (web framework), SQLAlchemy, (001-paper-library)
 - PostgreSQL (metadata + FTS via tsvector/GIN index); Google Drive (PDF files) (001-paper-library)
+- We do not use Alembic

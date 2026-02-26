@@ -24,6 +24,12 @@
     .paper-item:hover { background: #f9fafb; }
     .paper-title { font-weight: 600; color: #2563eb; }
     .paper-meta { font-size: 0.85rem; color: #666; margin-top: 0.2rem; }
+    .tag-filter { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.75rem; }
+    .tag-pill { padding: 0.2rem 0.65rem; border: 1px solid #ccc; border-radius: 999px; background: #f3f4f6; font-size: 0.78rem; cursor: pointer; color: #444; user-select: none; }
+    .tag-pill:hover { background: #e5e7eb; }
+    .tag-pill.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+    .paper-tags { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.35rem; }
+    .tag-chip { padding: 0.1rem 0.5rem; border-radius: 999px; background: #e0e7ff; color: #3730a3; font-size: 0.75rem; }
     .no-results { color: #999; font-style: italic; margin-top: 1rem; }
     .pagination { display: flex; align-items: center; justify-content: center; gap: 1rem; margin-top: 1.25rem; }
     .pagination button { padding: 0.35rem 0.9rem; border: 1px solid #ccc; border-radius: 4px; background: #fff; cursor: pointer; font-size: 0.9rem; }
@@ -50,6 +56,8 @@
       <option value="title">Title</option>
     </select>
   </div>
+
+  <div class="tag-filter" id="tag-filter" hidden></div>
 
   <ul class="paper-list" id="paper-list"></ul>
 

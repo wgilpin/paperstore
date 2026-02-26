@@ -1,13 +1,19 @@
 """Paper ORM model."""
 
+from __future__ import annotations
+
 import uuid
 from datetime import date, datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import ARRAY, FetchedValue, Index, String, Text, func
 from sqlalchemy.dialects.postgresql import TSVECTOR, UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.db import Base
+
+if TYPE_CHECKING:
+    from src.models.tag import Tag
 
 
 class Paper(Base):
@@ -24,7 +30,12 @@ class Paper(Base):
     drive_view_url: Mapped[str] = mapped_column(Text, nullable=False)
     added_at: Mapped[datetime] = mapped_column(nullable=False, server_default=func.now())
     # search_vector is a GENERATED ALWAYS column — created by raw DDL in create_tables().
-    # server_default=FetchedValue() tells SQLAlchemy the DB owns this column; never include in INSERT/UPDATE.
-    search_vector: Mapped[str | None] = mapped_column(TSVECTOR, nullable=True, server_default=FetchedValue())
+    # server_default=FetchedValue() tells SQLAlchemy the DB owns this column;
+    # never include in INSERT/UPDATE.
+    search_vector: Mapped[str | None] = mapped_column(
+        TSVECTOR, nullable=True, server_default=FetchedValue()
+    )
+
+    tags: Mapped[list[Tag]] = relationship("Tag", secondary="paper_tags", back_populates="papers")
 
     __table_args__ = (Index("idx_papers_search", "search_vector", postgresql_using="gin"),)

@@ -44,6 +44,10 @@ def get_session() -> Session:
 
 def create_tables() -> None:
     """Create all tables and ensure search_vector is a generated column."""
+    # Import models so Base.metadata includes them before create_all().
+    import src.models.paper_tag  # noqa: F401
+    import src.models.tag  # noqa: F401
+
     engine = _get_engine()
     Base.metadata.create_all(bind=engine)
 
