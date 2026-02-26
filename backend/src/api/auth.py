@@ -47,4 +47,5 @@ def callback(request: Request) -> RedirectResponse:
     token_path = Path(os.environ.get("GOOGLE_TOKEN_PATH", "token.json"))
     token_path.parent.mkdir(parents=True, exist_ok=True)
     token_path.write_text(creds.to_json())
+    request.session["authenticated"] = True
     return RedirectResponse("/")

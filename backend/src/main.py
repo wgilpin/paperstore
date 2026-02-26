@@ -1,11 +1,9 @@
 """FastAPI application entry point."""
 
-import asyncio
 import logging
 import os
 import pathlib
 from collections.abc import Awaitable, Callable
-from functools import partial
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s", datefmt="%H:%M:%S")
 
@@ -74,10 +72,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
     ) -> Response:
         if any(request.url.path.startswith(p) for p in _AUTH_EXEMPT_PREFIXES):
             return await call_next(request)
-        authenticated = await asyncio.get_event_loop().run_in_executor(
-            None, partial(_load_credentials)
-        )
-        if not authenticated:
+        if not request.session.get("authenticated"):
             return RedirectResponse("/auth/login")
         return await call_next(request)
 
