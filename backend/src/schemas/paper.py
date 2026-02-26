@@ -64,7 +64,11 @@ class PaperUpdateRequest(BaseModel):
             if len(parts) == 1:
                 return date(int(parts[0]), 1, 1)
             if len(parts) == 2:
-                return date(int(parts[0]), int(parts[1]), 1)
+                a, b = int(parts[0]), int(parts[1])
+                if a > 31:  # YYYY-MM
+                    return date(a, b, 1)
+                else:  # MM-YYYY
+                    return date(b, a, 1)
             # 3-part: disambiguate YYYY-MM-DD vs DD-MM-YYYY vs MM-DD-YYYY.
             a, b, c = int(parts[0]), int(parts[1]), int(parts[2])
             if a > 31:  # first part is a year → YYYY-MM-DD
