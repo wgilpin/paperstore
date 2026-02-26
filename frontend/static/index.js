@@ -33,6 +33,13 @@ function initIndexPage() {
     if (!addForm.hidden) urlInput.focus();
   });
 
+  // Restore state from URL on load
+  const initParams = new URLSearchParams(location.search);
+  if (initParams.get('page')) currentPage = Math.max(1, parseInt(initParams.get('page'), 10) || 1);
+  if (initParams.get('q')) searchInput.value = initParams.get('q');
+  if (initParams.get('sort')) sortSelect.value = initParams.get('sort');
+  if (initParams.get('tag')) activeTag = initParams.get('tag');
+
   // Load tags for filter bar, then load papers
   loadTags().then(() => loadPapers());
 
@@ -185,9 +192,22 @@ function initIndexPage() {
     if (currentPage < totalPages) { currentPage++; loadPapers(); }
   });
 
+  function syncUrl() {
+    const query = searchInput.value.trim();
+    const sort = sortSelect.value;
+    const p = new URLSearchParams();
+    if (currentPage > 1) p.set('page', String(currentPage));
+    if (query) p.set('q', query);
+    if (sort && sort !== sortSelect.options[0].value) p.set('sort', sort);
+    if (activeTag) p.set('tag', activeTag);
+    const qs = p.toString();
+    history.replaceState(null, '', qs ? `?${qs}` : location.pathname);
+  }
+
   async function loadPapers() {
     const query = searchInput.value.trim();
     const sort = sortSelect.value;
+    syncUrl();
     const params = new URLSearchParams({ sort, page: String(currentPage) });
     if (query) params.set('q', query);
     if (activeTag) params.set('tag', activeTag);

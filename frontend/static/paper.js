@@ -14,6 +14,12 @@ function initPaperPage() {
   const id = params.get('id');
   if (!id) { showError('No paper ID in URL.'); return; }
 
+  // Point back link at the referring page (preserves list pagination/filters)
+  const backLink = document.getElementById('back-link');
+  if (backLink && document.referrer && new URL(document.referrer).origin === location.origin) {
+    backLink.href = document.referrer;
+  }
+
   let allTags = [];  // fetched from /tags for autocomplete
 
   fetch(`${API}/tags`).then((r) => r.json()).then((d) => { allTags = d.tags || []; }).catch(() => {});

@@ -1,6 +1,7 @@
 """SQLAlchemy engine and session factory."""
 
 import os
+from collections.abc import Generator
 
 from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
@@ -35,11 +36,15 @@ def _get_engine() -> Engine:
     return _engine
 
 
-def get_session() -> Session:
-    """Return a new database session. Caller is responsible for closing it."""
+def get_session() -> Generator[Session, None, None]:
+    """Yield a database session and close it when the request is done."""
     _get_engine()
     assert _session_factory is not None
-    return _session_factory()
+    session = _session_factory()
+    try:
+        yield session
+    finally:
+        session.close()
 
 
 def create_tables() -> None:
