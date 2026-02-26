@@ -2,14 +2,14 @@
 
 from typing import Literal
 
-from sqlalchemy import func
+from sqlalchemy import func, nulls_last
 from sqlalchemy.orm import Session
 
 from src.models.paper import Paper
 from src.models.paper_tag import paper_tags
 from src.models.tag import Tag
 
-SortField = Literal["added_at", "title"]
+SortField = Literal["added_at", "title", "published_date"]
 
 PAGE_SIZE = 20
 
@@ -32,7 +32,12 @@ class SearchService:
         offset = (page - 1) * PAGE_SIZE
 
         if not query:
-            order = Paper.added_at.desc() if sort == "added_at" else Paper.title.asc()
+            if sort == "published_date":
+                order = nulls_last(Paper.published_date.desc())
+            elif sort == "title":
+                order = Paper.title.asc()
+            else:
+                order = Paper.added_at.desc()
             base = db.query(Paper).order_by(order)
             if tag:
                 base = (

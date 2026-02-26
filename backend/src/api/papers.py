@@ -74,7 +74,7 @@ def submit_paper(
 @router.get("", response_model=None)
 def list_papers(
     q: str | None = Query(default=None),
-    sort: Literal["added_at", "title"] = Query(default="added_at"),
+    sort: Literal["added_at", "title", "published_date"] = Query(default="added_at"),
     page: int = Query(default=1, ge=1),
     tag: str | None = Query(default=None),
     db: Session = Depends(get_session),
