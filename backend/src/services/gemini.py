@@ -2,15 +2,50 @@
 
 import io
 import json
+import logging
 import os
 
+import pdfplumber
 from google import genai
 
 from src.schemas.paper import ExtractedMetadata
 
+logger = logging.getLogger(__name__)
+
+_MAX_PAGES = 2
+
+
+def _page_text(page: pdfplumber.page.Page) -> str:  # type: ignore[name-defined]
+    """Extract text from a pdfplumber page using word-level joining to preserve spaces."""
+    words = page.extract_words(x_tolerance=3, y_tolerance=3, keep_blank_chars=False)
+    if not words:
+        return ""
+    lines: list[str] = []
+    current_line: list[str] = []
+    prev_bottom: float = words[0]["bottom"]
+    for word in words:
+        if abs(word["bottom"] - prev_bottom) > 5:
+            lines.append(" ".join(current_line))
+            current_line = []
+        current_line.append(word["text"])
+        prev_bottom = word["bottom"]
+    if current_line:
+        lines.append(" ".join(current_line))
+    return "\n".join(lines)
+
+
+def _extract_first_pages_text(pdf_bytes: bytes, max_pages: int) -> tuple[str, int]:
+    """Return text of the first *max_pages* pages and the actual page count sent."""
+    with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+        pages = pdf.pages[:max_pages]
+        text = "\n\n".join(_page_text(p) for p in pages)
+        return text, len(pages)
+
+
 _PROMPT = (
     "You are a research paper metadata extractor. "
-    "Read the attached PDF and return ONLY a valid JSON object with these keys:\n"
+    "The following is text extracted from the first pages of a research paper PDF. "
+    "Return ONLY a valid JSON object with these keys:\n"
     '  "title": string or null,\n'
     '  "authors": array of strings (full names),\n'
     '  "date": string in YYYY or YYYY-MM or YYYY-MM-DD format, or null,\n'
@@ -35,18 +70,16 @@ class GeminiService:
         if not model_name:
             raise ValueError("GEMINI_PDF_MODEL environment variable is not set")
 
+        text, pages_sent = _extract_first_pages_text(pdf_bytes, _MAX_PAGES)
+        logger.info("sending %d page(s) (%d chars) to Gemini model %s", pages_sent, len(text), model_name)
+
         client = genai.Client(api_key=api_key)
-
-        uploaded = client.files.upload(
-            file=io.BytesIO(pdf_bytes),
-            config={"mime_type": "application/pdf"},
-        )
-
         response = client.models.generate_content(
             model=model_name,
-            contents=[uploaded, _PROMPT],
+            contents=[_PROMPT, text],
         )
 
+        logger.info("Gemini response received (%d chars)", len(response.text))
         raw = response.text.strip()
         # Strip optional markdown code fence
         if raw.startswith("```"):

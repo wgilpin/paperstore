@@ -1,10 +1,22 @@
 """FastAPI application entry point."""
 
 import asyncio
+import logging
 import os
 import pathlib
 from collections.abc import Awaitable, Callable
 from functools import partial
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s", datefmt="%H:%M:%S")
+
+# Apply the same format to Uvicorn's loggers so they also show timestamps.
+for _uvicorn_logger in ("uvicorn", "uvicorn.error", "uvicorn.access"):
+    _log = logging.getLogger(_uvicorn_logger)
+    _log.handlers.clear()
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s", datefmt="%H:%M:%S"))
+    _log.addHandler(_handler)
+    _log.propagate = False
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware

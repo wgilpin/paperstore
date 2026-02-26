@@ -1,8 +1,12 @@
 """Papers API router."""
 
+import logging
+import time
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+
+logger = logging.getLogger(__name__)
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -185,7 +189,10 @@ def extract_metadata(
     try:
         from src.services.drive import DriveService
 
+        logger.info("downloading PDF from Drive for paper %s", paper_id)
+        t0 = time.monotonic()
         pdf_bytes = DriveService().download(paper.drive_file_id)
+        logger.info("Drive download complete in %.1fs (%d bytes)", time.monotonic() - t0, len(pdf_bytes))
     except DriveUploadError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     try:
