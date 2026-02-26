@@ -84,6 +84,13 @@ class PaperUpdateRequest(BaseModel):
             raise ValueError(f"Unrecognised date format: {v!r}") from exc
 
 
+class ExtractedMetadata(BaseModel):
+    title: str | None
+    authors: list[str]
+    date: str | None
+    abstract: str | None
+
+
 class ErrorResponse(BaseModel):
     error: str
     detail: str | None = None

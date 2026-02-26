@@ -53,6 +53,7 @@ function initPaperPage() {
     document.getElementById('delete-btn').addEventListener('click', () => deletePaper(paper.id, paper.title));
     setupInlineTags(paper);
     setupEditForm(paper);
+    setupExtractButton(paper);
   }
 
   function setupInlineTags(paper) {
@@ -142,6 +143,12 @@ function initPaperPage() {
       document.getElementById('edit-authors').value = paper.authors.join(', ');
       document.getElementById('edit-date').value = paper.published_date || '';
       document.getElementById('edit-abstract').value = paper.abstract || '';
+      ['suggest-title', 'suggest-authors', 'suggest-date', 'suggest-abstract'].forEach((id) => {
+        const el = document.getElementById(id);
+        el.classList.remove('visible');
+        el.innerHTML = '';
+      });
+      document.getElementById('accept-all-btn').style.display = 'none';
       editStatus.textContent = '';
       editError.textContent = '';
       editForm.classList.add('visible');
@@ -222,6 +229,89 @@ function initPaperPage() {
       btn.disabled = false;
       btn.textContent = 'Delete paper';
     }
+  }
+
+  function setupExtractButton(paper) {
+    const extractBtn = document.getElementById('extract-btn');
+    const extractStatus = document.getElementById('extract-status');
+    const extractError = document.getElementById('extract-error');
+    const editBtn = document.getElementById('edit-btn');
+    const editForm = document.getElementById('edit-form');
+    const editStatus = document.getElementById('edit-status');
+    const editError = document.getElementById('edit-error');
+
+    extractBtn.addEventListener('click', async () => {
+      extractBtn.disabled = true;
+      extractBtn.textContent = 'Extracting…';
+      extractStatus.textContent = '';
+      extractError.textContent = '';
+
+      try {
+        const res = await fetch(`${API}/papers/${paper.id}/extract-metadata`, { method: 'POST' });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          extractError.textContent = data.detail || 'Extraction failed.';
+          return;
+        }
+        const data = await res.json();
+        const m = data.metadata;
+
+        // Open the edit form with conflict-aware filling
+        const existingAuthors = paper.authors && paper.authors.length ? paper.authors.join(', ') : '';
+        const llmAuthors = m.authors && m.authors.length ? m.authors.join(', ') : '';
+        const acceptAllBtn = document.getElementById('accept-all-btn');
+        const pendingAccepts = [];  // list of () => void for each pending suggestion
+
+        function applyField(inputId, suggestId, existing, llmValue) {
+          const input = document.getElementById(inputId);
+          const suggest = document.getElementById(suggestId);
+          suggest.classList.remove('visible');
+          suggest.innerHTML = '';
+          if (!existing && llmValue) {
+            // Empty field — fill silently
+            input.value = llmValue;
+          } else if (existing && llmValue && llmValue !== existing) {
+            // Conflict — keep existing, show suggestion
+            input.value = existing;
+            const preview = llmValue.length > 80 ? llmValue.slice(0, 80) + '…' : llmValue;
+            suggest.innerHTML = `LLM suggested: <strong>${escapeHtml(preview)}</strong><button type="button">Use this</button>`;
+            suggest.classList.add('visible');
+            const accept = () => { input.value = llmValue; suggest.classList.remove('visible'); };
+            suggest.querySelector('button').addEventListener('click', accept);
+            pendingAccepts.push(accept);
+          } else {
+            // Same value or no LLM value — just fill with existing
+            input.value = existing || '';
+          }
+        }
+
+        applyField('edit-title', 'suggest-title', paper.title || '', m.title || '');
+        applyField('edit-authors', 'suggest-authors', existingAuthors, llmAuthors);
+        applyField('edit-date', 'suggest-date', paper.published_date || '', m.date || '');
+        applyField('edit-abstract', 'suggest-abstract', paper.abstract || '', m.abstract || '');
+
+        if (pendingAccepts.length > 0) {
+          acceptAllBtn.style.display = '';
+          acceptAllBtn.onclick = () => {
+            pendingAccepts.forEach((fn) => fn());
+            acceptAllBtn.style.display = 'none';
+          };
+        } else {
+          acceptAllBtn.style.display = 'none';
+        }
+        editStatus.textContent = '';
+        editError.textContent = '';
+        editForm.classList.add('visible');
+        editBtn.style.display = 'none';
+
+        extractStatus.textContent = 'Review extracted metadata and save.';
+      } catch {
+        extractError.textContent = 'Network error — is the server running?';
+      } finally {
+        extractBtn.disabled = false;
+        extractBtn.textContent = 'Extract metadata';
+      }
+    });
   }
 
   async function saveNote(paperId, content) {

@@ -23,8 +23,18 @@
     #delete-btn { background: none; border: 1px solid #dc2626; color: #dc2626; padding: 0.4rem 0.9rem; border-radius: 4px; font-size: 0.875rem; cursor: pointer; }
     #delete-btn:hover { background: #dc2626; color: #fff; }
     #delete-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    #edit-btn { background: none; border: 1px solid #2563eb; color: #2563eb; padding: 0.4rem 0.9rem; border-radius: 4px; font-size: 0.875rem; cursor: pointer; margin-bottom: 1rem; }
-    #edit-btn:hover { background: #2563eb; color: #fff; }
+    #edit-btn, #extract-btn { background: none; border: 1px solid #2563eb; color: #2563eb; padding: 0.4rem 0.9rem; border-radius: 4px; font-size: 0.875rem; cursor: pointer; margin-bottom: 1rem; }
+    #edit-btn:hover, #extract-btn:hover { background: #2563eb; color: #fff; }
+    #extract-btn { margin-right: 0.5rem; }
+    #extract-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    #extract-status { font-size: 0.8rem; color: #16a34a; min-height: 1.2em; margin-bottom: 0.5rem; }
+    #extract-error { font-size: 0.8rem; color: #dc2626; min-height: 1.2em; margin-bottom: 0.5rem; }
+    .llm-suggestion { font-size: 0.8rem; color: #6b7280; margin-top: 0.25rem; display: none; }
+    .llm-suggestion.visible { display: block; }
+    .llm-suggestion strong { color: #374151; }
+    .llm-suggestion button { background: none; border: none; color: #2563eb; cursor: pointer; font-size: 0.8rem; padding: 0; text-decoration: underline; margin-left: 0.5rem; }
+    #accept-all-btn { display: none; font-size: 0.8rem; background: none; border: 1px solid #6b7280; color: #374151; padding: 0.25rem 0.6rem; border-radius: 4px; cursor: pointer; margin-bottom: 0.5rem; }
+    #accept-all-btn:hover { background: #f3f4f6; }
     #edit-form { display: none; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 1rem; margin-bottom: 1.5rem; }
     #edit-form.visible { display: block; }
     .edit-field { margin-bottom: 0.75rem; }
@@ -75,24 +85,32 @@
       </div>
     </div>
     <p class="abstract" id="paper-abstract"></p>
+    <button id="extract-btn">Extract metadata</button>
     <button id="edit-btn">Edit</button>
+    <div id="extract-status"></div>
+    <div id="extract-error"></div>
     <div id="edit-form">
       <div class="edit-field">
         <label for="edit-title">Title</label>
         <input id="edit-title" type="text" />
+        <div class="llm-suggestion" id="suggest-title"></div>
       </div>
       <div class="edit-field">
         <label for="edit-authors">Authors <span style="font-weight:normal;color:#6b7280">(comma-separated)</span></label>
         <input id="edit-authors" type="text" />
+        <div class="llm-suggestion" id="suggest-authors"></div>
       </div>
       <div class="edit-field">
         <label for="edit-date">Published date <span style="font-weight:normal;color:#6b7280">(e.g. 2017 or 2017-06 or 2017-06-15)</span></label>
         <input id="edit-date" type="text" placeholder="YYYY or YYYY-MM or YYYY-MM-DD" />
+        <div class="llm-suggestion" id="suggest-date"></div>
       </div>
       <div class="edit-field">
         <label for="edit-abstract">Abstract</label>
         <textarea id="edit-abstract"></textarea>
+        <div class="llm-suggestion" id="suggest-abstract"></div>
       </div>
+      <button id="accept-all-btn">Accept all suggestions</button>
       <div class="edit-actions">
         <button id="save-btn">Save</button>
         <button id="cancel-btn">Cancel</button>

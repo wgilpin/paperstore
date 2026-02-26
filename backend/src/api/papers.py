@@ -12,6 +12,7 @@ from src.models.paper import Paper
 from src.models.tag import Tag
 from src.schemas.note import NoteResponse, NoteUpdateRequest
 from src.schemas.paper import (
+    ExtractedMetadata,
     NoteSchema,
     PaperDetail,
     PaperSubmitRequest,
@@ -19,6 +20,7 @@ from src.schemas.paper import (
     PaperUpdateRequest,
 )
 from src.services.drive import DriveUploadError
+from src.services.gemini import GeminiService
 from src.services.ingestion import DuplicateError, IngestionService
 from src.services.search import SearchService
 
@@ -170,6 +172,27 @@ def update_note(
     db.commit()
     db.refresh(note)
     return {"note": NoteResponse(content=note.content, updated_at=note.updated_at)}
+
+
+@router.post("/{paper_id}/extract-metadata")
+def extract_metadata(
+    paper_id: str,
+    db: Session = Depends(get_session),
+) -> dict[str, ExtractedMetadata]:
+    paper = db.query(Paper).filter(Paper.id == paper_id).first()
+    if paper is None:
+        raise HTTPException(status_code=404, detail="Paper not found")
+    try:
+        from src.services.drive import DriveService
+
+        pdf_bytes = DriveService().download(paper.drive_file_id)
+    except DriveUploadError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    try:
+        metadata = GeminiService().extract_metadata(pdf_bytes)
+    except ValueError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return {"metadata": metadata}
 
 
 @router.get("/{paper_id}/pdf")

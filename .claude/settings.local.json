@@ -16,7 +16,8 @@
       "mcp__context7__resolve-library-id",
       "mcp__context7__query-docs",
       "WebFetch(domain:google-auth-oauthlib.readthedocs.io)",
-      "WebFetch(domain:developers.google.com)"
+      "WebFetch(domain:developers.google.com)",
+      "Bash(uv sync)"
     ]
   }
 }

@@ -6,7 +6,7 @@ from typing import Any
 
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseUpload
+from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
 
 from src.services.types import DriveUploadResult
 
@@ -74,6 +74,23 @@ class DriveService:
             # Use the /preview URL — it embeds cleanly in iframes unlike /view.
             embed_url = f"https://drive.google.com/file/d/{file_id}/preview"
             return DriveUploadResult(file_id=file_id, view_url=embed_url)
+        except Exception as exc:
+            raise DriveUploadError(str(exc)) from exc
+
+    def download(self, file_id: str) -> bytes:
+        """Download *file_id* from Drive and return its raw bytes.
+
+        Raises DriveUploadError on failure.
+        """
+        try:
+            service = self._get_service()
+            request = service.files().get_media(fileId=file_id)
+            buf = io.BytesIO()
+            downloader = MediaIoBaseDownload(buf, request)
+            done = False
+            while not done:
+                _, done = downloader.next_chunk()
+            return buf.getvalue()
         except Exception as exc:
             raise DriveUploadError(str(exc)) from exc
 
