@@ -57,13 +57,27 @@ class PaperUpdateRequest(BaseModel):
             return None
         if isinstance(v, date):
             return v
-        s = str(v).strip()
+        # Normalise unicode dashes to ASCII hyphen before splitting
+        s = str(v).strip().replace("\u2013", "-").replace("\u2014", "-")
         parts = s.split("-")
-        if len(parts) == 1:
-            return date(int(parts[0]), 1, 1)
-        if len(parts) == 2:
-            return date(int(parts[0]), int(parts[1]), 1)
-        return date.fromisoformat(s)
+        try:
+            if len(parts) == 1:
+                return date(int(parts[0]), 1, 1)
+            if len(parts) == 2:
+                return date(int(parts[0]), int(parts[1]), 1)
+            # 3-part: disambiguate YYYY-MM-DD vs DD-MM-YYYY vs MM-DD-YYYY.
+            a, b, c = int(parts[0]), int(parts[1]), int(parts[2])
+            if a > 31:  # first part is a year → YYYY-MM-DD
+                return date(a, b, c)
+            elif c > 31:  # last part is a year
+                if a > 12:  # first part can't be a month → DD-MM-YYYY
+                    return date(c, b, a)
+                else:  # ambiguous; assume DD-MM-YYYY
+                    return date(c, b, a)
+            else:
+                raise ValueError(f"Unrecognised date format: {v!r}")
+        except (ValueError, IndexError) as exc:
+            raise ValueError(f"Unrecognised date format: {v!r}") from exc
 
 
 class ErrorResponse(BaseModel):

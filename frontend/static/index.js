@@ -4,6 +4,7 @@ function initIndexPage() {
   const addForm = document.getElementById('add-form');
   if (!addForm) return;
 
+  const addToggle = document.getElementById('add-toggle');
   const urlInput = document.getElementById('url-input');
   const addBtn = document.getElementById('add-btn');
   const addStatus = document.getElementById('add-status');
@@ -26,6 +27,11 @@ function initIndexPage() {
   let totalPages = 1;
   let activeTag = null;
   let allTags = [];
+
+  addToggle.addEventListener('click', () => {
+    addForm.hidden = !addForm.hidden;
+    if (!addForm.hidden) urlInput.focus();
+  });
 
   // Load tags for filter bar, then load papers
   loadTags().then(() => loadPapers());
@@ -140,6 +146,7 @@ function initIndexPage() {
         addStatus.className = 'success';
         addStatus.textContent = `Added: "${data.paper.title}"`;
         urlInput.value = '';
+        addForm.hidden = true;
         currentPage = 1;
         loadTags();
         loadPapers();
