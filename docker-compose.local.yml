@@ -5,3 +5,5 @@ services:
     volumes:
       - ./backend/src:/app/src
       - ./frontend:/frontend
+    environment:
+      OAUTHLIB_INSECURE_TRANSPORT: "1"
