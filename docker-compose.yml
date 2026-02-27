@@ -24,13 +24,13 @@ services:
       # Read-only credentials file from host (must exist before starting)
       - "${GOOGLE_CREDENTIALS_PATH}:/root/.config/paperstore/credentials.json:ro"
       # Named volume for token so Docker creates it; persists across restarts
-      - google_token:/root/.config/paperstore
+      - google_token:/root/.config/paperstore/token
     depends_on:
       - db
     environment:
       DATABASE_URL: postgresql://paperstore:paperstore@db:5432/paperstore
       GOOGLE_CREDENTIALS_PATH: /root/.config/paperstore/credentials.json
-      GOOGLE_TOKEN_PATH: /root/.config/paperstore/token.json
+      GOOGLE_TOKEN_PATH: /root/.config/paperstore/token/token.json
       OAUTHLIB_INSECURE_TRANSPORT: "1"
 
 volumes:
