@@ -21,9 +21,6 @@ services:
     env_file:
       - .env
     volumes:
-      # Source mounts for --reload hot-reloading
-      - ./backend/src:/app/src
-      - ./frontend:/frontend
       # Read-only credentials file from host (must exist before starting)
       - "${GOOGLE_CREDENTIALS_PATH}:/root/.config/paperstore/credentials.json:ro"
       # Named volume for token so Docker creates it; persists across restarts
