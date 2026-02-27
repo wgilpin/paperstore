@@ -22,12 +22,15 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from starlette.responses import Response
 
 from src.db import create_tables
 from src.schemas.paper import ErrorResponse
 
 app = FastAPI(title="PaperStore")
+
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=["*"])
 
 # Allow the Chrome extension (chrome-extension://*) and local dev front end.
 app.add_middleware(
