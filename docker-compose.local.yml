@@ -3,6 +3,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
+      - "${GOOGLE_CREDENTIALS_PATH}:/run/secrets/paperstore-credentials.json:ro"
       - ./backend/src:/app/src
       - ./frontend:/frontend
     environment:
