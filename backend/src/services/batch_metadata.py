@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 _COST_PER_PAPER_USD = 0.005
 _CHUNK_SIZE = 20
-_POLL_INTERVAL_SECONDS = 30
+_POLL_INTERVAL_SECONDS = 300
 
 
 def _is_eligible(paper: Paper) -> bool:
