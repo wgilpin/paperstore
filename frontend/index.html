@@ -47,12 +47,24 @@
     .pagination button { padding: 0.35rem 0.9rem; border: 1px solid #ccc; border-radius: 4px; background: #fff; cursor: pointer; font-size: 0.9rem; }
     .pagination button:disabled { opacity: 0.4; cursor: not-allowed; }
     #page-info { font-size: 0.85rem; color: #555; }
+    .header-actions { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; }
+    #enrich-btn { padding: 0.5rem 1rem; background: #059669; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 1rem; }
+    #enrich-btn:hover { background: #047857; }
+    #enrich-btn:disabled { opacity: 0.6; cursor: not-allowed; background: #059669; }
+    #enrich-status { font-size: 0.85rem; color: #555; }
+    #enrich-status.error { color: #dc2626; }
+    #enrich-status.success { color: #16a34a; }
+    #enrich-status.running { color: #d97706; }
   </style>
 </head>
 <body>
   <h1>PaperStore</h1>
 
-  <button class="add-toggle" id="add-toggle">+ Add Paper</button>
+  <div class="header-actions">
+    <button class="add-toggle" id="add-toggle">+ Add Paper</button>
+    <button id="enrich-btn">Add All Metadata</button>
+    <span id="enrich-status"></span>
+  </div>
   <form class="add-form" id="add-form" hidden>
     <input type="url" id="url-input" placeholder="Paste an arXiv URL or PDF URL…" required />
     <button type="submit" id="add-btn">Add</button>
