@@ -20,6 +20,8 @@ function initIndexPage() {
   const tagPillsRow = document.getElementById('tag-pills-row');
   const tagAutocomplete = document.getElementById('tag-autocomplete');
   const tagDropdown = document.getElementById('tag-dropdown');
+  const enrichBtn = document.getElementById('enrich-btn');
+  const enrichStatus = document.getElementById('enrich-status');
 
   const PAGE_SIZE = 20;
   const TOP_TAGS = 6;  // number of most-common tags shown as pills
@@ -40,8 +42,89 @@ function initIndexPage() {
   if (initParams.get('sort')) sortSelect.value = initParams.get('sort');
   if (initParams.get('tag')) activeTag = initParams.get('tag');
 
-  // Load tags for filter bar, then load papers
+  // Load tags for filter bar, then load papers; also check batch job status on load
   loadTags().then(() => loadPapers());
+  checkBatchStatus();
+
+  // ── Batch metadata enrichment ────────────────────────────────────────────
+
+  function setEnrichStatus(msg, cls) {
+    enrichStatus.textContent = msg;
+    enrichStatus.className = cls || '';
+  }
+
+  async function checkBatchStatus() {
+    try {
+      const res = await fetch(`${API}/batch/metadata/status`);
+      if (!res.ok) return;
+      const data = await res.json();
+      const job = data.job;
+      if (!job) {
+        enrichBtn.disabled = false;
+        setEnrichStatus('', '');
+        return;
+      }
+      if (job.state === 'pending' || job.state === 'running') {
+        enrichBtn.disabled = true;
+        setEnrichStatus(`Batch job in progress (${job.paper_count} paper${job.paper_count !== 1 ? 's' : ''})…`, 'running');
+      } else if (job.state === 'applied') {
+        enrichBtn.disabled = false;
+        setEnrichStatus(`Metadata applied for ${job.paper_count} paper${job.paper_count !== 1 ? 's' : ''}.`, 'success');
+        loadPapers();
+      } else if (job.state === 'failed') {
+        enrichBtn.disabled = false;
+        setEnrichStatus('Batch job failed. Try again.', 'error');
+      } else {
+        enrichBtn.disabled = false;
+        setEnrichStatus('', '');
+      }
+    } catch {
+      // Non-fatal — status bar stays blank
+    }
+  }
+
+  enrichBtn.addEventListener('click', async () => {
+    let count = 0;
+    let costUsd = 0;
+    try {
+      const res = await fetch(`${API}/batch/metadata/eligible-count`);
+      if (res.ok) {
+        const data = await res.json();
+        count = data.count;
+        costUsd = data.estimated_cost_usd;
+      }
+    } catch { /* ignore — show generic confirm */ }
+
+    if (count === 0) {
+      setEnrichStatus('All papers already have metadata.', 'success');
+      return;
+    }
+
+    const costStr = costUsd.toFixed(3);
+    const confirmed = window.confirm(
+      `This will extract metadata (abstract, authors, date) for ${count} paper${count !== 1 ? 's' : ''} using the Gemini API.\n\nEstimated cost: $${costStr} (~$0.005 per paper).\n\nThe job runs in the background and results are applied automatically. Continue?`
+    );
+    if (!confirmed) return;
+
+    enrichBtn.disabled = true;
+    setEnrichStatus('Starting batch job…', 'running');
+    try {
+      const res = await fetch(`${API}/batch/metadata`, { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        const job = data.job;
+        setEnrichStatus(`Batch job started (${job.paper_count} paper${job.paper_count !== 1 ? 's' : ''}). Results will appear here when ready.`, 'running');
+      } else if (res.status === 409) {
+        setEnrichStatus('A batch job is already running.', 'running');
+      } else {
+        enrichBtn.disabled = false;
+        setEnrichStatus(data.detail || 'Failed to start batch job.', 'error');
+      }
+    } catch {
+      enrichBtn.disabled = false;
+      setEnrichStatus('Network error — is the server running?', 'error');
+    }
+  });
 
   async function loadTags() {
     try {
