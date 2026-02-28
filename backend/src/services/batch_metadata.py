@@ -316,6 +316,24 @@ def start_batch_job(db: Session) -> BatchJobStatus:
     return _job_to_status(job)
 
 
+def resume_interrupted_job(db: Session) -> None:
+    """If a job was left in 'running' state (server restart), re-spawn its thread."""
+    job = (
+        db.query(BatchJob)
+        .filter(BatchJob.state == "running")
+        .order_by(BatchJob.created_at.desc())
+        .first()
+    )
+    if job is None:
+        return
+    logger.info("resuming interrupted batch job %s (%d papers)", job.id, len(job.paper_ids))
+    threading.Thread(
+        target=_run_chunked_batches,
+        args=(job.id, job.paper_ids),
+        daemon=True,
+    ).start()
+
+
 def check_and_apply_batch(db: Session) -> BatchJobStatus | None:
     """Return the status of the active batch job, or None if there is none.
 
