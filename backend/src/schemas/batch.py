@@ -8,8 +8,9 @@ from pydantic import BaseModel
 
 class BatchJobStatus(BaseModel):
     id: uuid.UUID
-    state: str  # pending | running | succeeded | failed | applied
+    state: str  # preparing | running | applied | failed
     paper_count: int
+    papers_done: int
     created_at: datetime
     completed_at: datetime | None
 

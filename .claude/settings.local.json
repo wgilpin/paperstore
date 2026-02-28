@@ -12,6 +12,7 @@
       "Bash(git diff*)",
       "Bash(git log*)",
       "Bash(git add*)",
+      "cd /c/Users/wgilp/projects/paperStore/backend",
       "mcp__context7__resolve-library-id",
       "mcp__context7__query-docs",
       "WebFetch(domain:google-auth-oauthlib.readthedocs.io)",

@@ -17,8 +17,9 @@ class BatchJob(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     gemini_job_name: Mapped[str] = mapped_column(Text, nullable=False)
-    # state: pending | running | succeeded | failed | applied
+    # state: preparing | running | applied | failed
     state: Mapped[str] = mapped_column(Text, nullable=False)
     paper_ids: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False, server_default="{}")
+    papers_done: Mapped[int] = mapped_column(nullable=False, server_default="0")
     created_at: Mapped[datetime] = mapped_column(nullable=False, server_default=func.now())
     completed_at: Mapped[datetime | None] = mapped_column(nullable=True)

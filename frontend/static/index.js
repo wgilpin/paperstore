@@ -64,12 +64,15 @@ function initIndexPage() {
         setEnrichStatus('', '');
         return;
       }
-      if (job.state === 'pending' || job.state === 'running') {
+      if (job.state === 'preparing' || job.state === 'running') {
         enrichBtn.disabled = true;
-        setEnrichStatus(`Batch job in progress (${job.paper_count} paper${job.paper_count !== 1 ? 's' : ''})…`, 'running');
+        const progress = job.state === 'preparing'
+          ? `Preparing ${job.paper_count} paper${job.paper_count !== 1 ? 's' : ''}…`
+          : `Processing ${job.papers_done}/${job.paper_count} papers…`;
+        setEnrichStatus(progress, 'running');
       } else if (job.state === 'applied') {
         enrichBtn.disabled = false;
-        setEnrichStatus(`Metadata applied for ${job.paper_count} paper${job.paper_count !== 1 ? 's' : ''}.`, 'success');
+        setEnrichStatus(`Metadata applied for ${job.papers_done} of ${job.paper_count} paper${job.paper_count !== 1 ? 's' : ''}.`, 'success');
         loadPapers();
       } else if (job.state === 'failed') {
         enrichBtn.disabled = false;

@@ -123,3 +123,11 @@ def create_tables() -> None:
     with engine.connect() as conn:
         conn.execute(text(_fix_search_vector_sql))
         conn.commit()
+
+    # Add papers_done column to batch_jobs if it was created before this column existed.
+    _add_batch_progress_sql = """
+    ALTER TABLE batch_jobs ADD COLUMN IF NOT EXISTS papers_done INTEGER NOT NULL DEFAULT 0;
+    """
+    with engine.connect() as conn:
+        conn.execute(text(_add_batch_progress_sql))
+        conn.commit()
