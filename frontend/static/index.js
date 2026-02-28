@@ -83,7 +83,7 @@ function initIndexPage() {
     }
   }
 
-  enrichBtn.addEventListener('click', async () => {
+  enrichBtn?.addEventListener('click', async () => {
     let count = 0;
     let costUsd = 0;
     try {
