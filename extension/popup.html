@@ -44,55 +44,8 @@
 </head>
 <body>
   <h1>PaperStore</h1>
-  <div id="status">Ready to add this paper to your library.</div>
-  <button id="addBtn">Add Paper</button>
-
-  <script>
-    const statusEl = document.getElementById("status");
-    const addBtn = document.getElementById("addBtn");
-
-    function setStatus(cls, text) {
-      statusEl.className = cls;
-      statusEl.textContent = text;
-    }
-
-    addBtn.addEventListener("click", async () => {
-      addBtn.disabled = true;
-      setStatus("submitting", "Fetching arXiv ID…");
-
-      // Ask the content script for the arXiv ID of the current tab.
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-
-      let arxivId = null;
-      try {
-        const response = await chrome.tabs.sendMessage(tab.id, { type: "GET_ARXIV_ID" });
-        arxivId = response?.arxivId ?? null;
-      } catch {
-        // Content script not injected (non-arXiv page or first load).
-      }
-
-      if (!arxivId) {
-        setStatus("error", "No arXiv paper detected on this page.");
-        addBtn.disabled = false;
-        return;
-      }
-
-      setStatus("submitting", "Submitting to PaperStore…");
-
-      const result = await chrome.runtime.sendMessage({
-        type: "SUBMIT_PAPER",
-        arxivId,
-      });
-
-      if (result.status === "success") {
-        setStatus("success", "Paper added to your library!");
-      } else if (result.status === "duplicate") {
-        setStatus("duplicate", "This paper is already in your library.");
-      } else {
-        setStatus("error", `Error: ${result.message ?? "Unknown error"}`);
-        addBtn.disabled = false;
-      }
-    });
-  </script>
+  <div id="status">Checking current page…</div>
+  <button id="addBtn" disabled>Add Paper</button>
+  <script src="popup.js"></script>
 </body>
 </html>

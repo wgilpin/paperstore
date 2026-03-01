@@ -80,14 +80,20 @@ class IngestionService:
         db.refresh(paper)
         return paper
 
-    def ingest_local(self, pdf_bytes: bytes, local_path: Path, db: Session) -> Paper:
+    def ingest_local(
+        self,
+        pdf_bytes: bytes,
+        local_path: Path,
+        db: Session,
+        source_url: str | None = None,
+    ) -> Paper:
         """Ingest a locally stored PDF into the library.
 
         Returns the created Paper ORM object.
         Raises DuplicateError if the paper already exists (by path or title).
         Raises DriveUploadError if the Drive upload fails (no partial record created).
         """
-        submission_url = local_path.as_uri()
+        submission_url = source_url if source_url else local_path.as_uri()
 
         if db.query(Paper).filter(Paper.submission_url == submission_url).first():
             raise DuplicateError("Paper already exists in your library")

@@ -3,9 +3,10 @@
 import logging
 import threading
 import time
+from pathlib import Path
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -96,6 +97,33 @@ def submit_paper(
     if _is_eligible(paper):
         _enrich_paper_async(str(paper.id), paper.drive_file_id)
 
+    note = db.query(Note).filter(Note.paper_id == paper.id).first()
+    assert note is not None
+    return {"paper": _to_paper_detail(paper, note)}
+
+
+@router.post("/upload", status_code=201)
+def upload_paper(
+    file: UploadFile = File(...),
+    source_url: str | None = Form(default=None),
+    db: Session = Depends(get_session),
+) -> dict[str, PaperDetail]:
+    pdf_bytes = file.file.read()
+    if not pdf_bytes.startswith(b"%PDF"):
+        raise HTTPException(status_code=422, detail="Uploaded file is not a PDF")
+    filename = file.filename or "upload.pdf"
+    local_path = Path(filename)
+    svc = IngestionService()
+    try:
+        paper = svc.ingest_local(pdf_bytes=pdf_bytes, local_path=local_path, source_url=source_url, db=db)
+    except DuplicateError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except DriveUploadError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    if _is_eligible(paper):
+        _enrich_paper_async(str(paper.id), paper.drive_file_id)
     note = db.query(Note).filter(Note.paper_id == paper.id).first()
     assert note is not None
     return {"paper": _to_paper_detail(paper, note)}

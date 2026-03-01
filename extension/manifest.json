@@ -1,24 +1,15 @@
 {
   "manifest_version": 3,
   "name": "PaperStore",
-  "version": "1.0.0",
-  "description": "One-click arXiv paper submission to your PaperStore library.",
-  "permissions": [
-    "storage",
-    "activeTab"
-  ],
+  "version": "2.0.0",
+  "description": "Save arXiv papers and PDFs to your PaperStore library.",
+  "permissions": ["activeTab", "tabs"],
   "host_permissions": [
+    "https://papers.teleosis.ai/*",
     "https://arxiv.org/*",
-    "http://localhost:8000/*"
-  ],
-  "background": {
-    "service_worker": "service-worker.js"
-  },
-  "content_scripts": [
-    {
-      "matches": ["https://arxiv.org/*"],
-      "js": ["content.js"]
-    }
+    "https://*.arxiv.org/*",
+    "https://alphaxiv.org/*",
+    "https://*.alphaxiv.org/*"
   ],
   "action": {
     "default_popup": "popup.html",
