@@ -77,7 +77,6 @@ def _loop() -> None:
         stop_loop()
         return
 
-    drive = DriveService()
     logger.info("batch loop started")
 
     while is_running():
@@ -88,7 +87,7 @@ def _loop() -> None:
                 logger.info("batch loop: no eligible papers remaining, stopping")
                 stop_loop()
                 break
-            job = _submit_chunk(chunk, client, model_name, drive, db)
+            job = _submit_chunk(chunk, client, model_name, db)
             if job is not None:
                 threading.Thread(
                     target=_poll_apply_thread,
@@ -99,7 +98,6 @@ def _loop() -> None:
             logger.error("batch loop: chunk failed: %s", exc)
         finally:
             db.close()
-
     logger.info("batch loop stopped")
 
 
@@ -180,16 +178,15 @@ def _poll_apply_thread(
 
 # ── Core chunk functions ──────────────────────────────────────────────────────
 
-def _download_pdf_bytes(pid: str, paper: Paper, drive: DriveService) -> tuple[str, bytes]:
-    """Download raw PDF bytes for a single paper. Returns (pid, bytes)."""
-    return pid, drive.download(paper.drive_file_id)
+def _download_pdf_bytes(pid: str, paper: Paper) -> tuple[str, bytes]:
+    """Download raw PDF bytes for a single paper using a thread-local DriveService."""
+    return pid, DriveService().download(paper.drive_file_id)
 
 
 def _submit_chunk(
     chunk_ids: list[str],
     client: genai.Client,
     model_name: str,
-    drive: DriveService,
     db: Session,
 ) -> BatchJob | None:
     """Download PDFs in parallel, extract text sequentially, submit to Gemini Batch API."""
@@ -202,7 +199,7 @@ def _submit_chunk(
     pdf_bytes_by_id: dict[str, bytes] = {}
     with ThreadPoolExecutor(max_workers=_CHUNK_SIZE) as pool:
         futures = {
-            pool.submit(_download_pdf_bytes, pid, papers_by_id[pid], drive): pid
+            pool.submit(_download_pdf_bytes, pid, papers_by_id[pid]): pid
             for pid in chunk_ids
             if pid in papers_by_id
         }
