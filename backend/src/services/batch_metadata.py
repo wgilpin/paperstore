@@ -7,6 +7,7 @@ import threading
 import time
 import uuid
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime
 
 from google import genai
@@ -79,7 +80,6 @@ def _loop() -> None:
     drive = DriveService()
     logger.info("batch loop started")
 
-    global _papers_done
     while is_running():
         db = session_factory()
         try:
@@ -90,10 +90,11 @@ def _loop() -> None:
                 break
             job = _submit_chunk(chunk, client, model_name, drive, db)
             if job is not None:
-                applied = _poll_and_apply(job, client, db)
-                with _lock:
-                    _papers_done += applied
-                logger.info("batch loop: chunk done, %d applied so far", _papers_done)
+                threading.Thread(
+                    target=_poll_apply_thread,
+                    args=(job.id, client, session_factory),
+                    daemon=True,
+                ).start()
         except Exception as exc:
             logger.error("batch loop: chunk failed: %s", exc)
         finally:
@@ -154,7 +155,37 @@ def _resume_job_thread(
         db.close()
 
 
+def _poll_apply_thread(
+    job_id: uuid.UUID,
+    client: genai.Client,
+    session_factory: Callable[[], Session],
+) -> None:
+    """Background thread: poll a newly submitted batch and apply its results."""
+    global _papers_done
+    db = session_factory()
+    try:
+        job = db.query(BatchJob).filter(BatchJob.id == job_id).first()
+        if job is None:
+            logger.error("poll thread: job %s not found in DB", job_id)
+            return
+        applied = _poll_and_apply(job, client, db)
+        with _lock:
+            _papers_done += applied
+        logger.info("poll thread: job %s — applied %d", job_id, applied)
+    except Exception as exc:
+        logger.error("poll thread: job %s failed: %s", job_id, exc)
+    finally:
+        db.close()
+
+
 # ── Core chunk functions ──────────────────────────────────────────────────────
+
+def _download_paper_text(pid: str, paper: Paper, drive: DriveService) -> tuple[str, str]:
+    """Download and extract text from a single paper's PDF. Returns (pid, text)."""
+    pdf_bytes = drive.download(paper.drive_file_id)
+    text, _ = _extract_first_pages_text(pdf_bytes, _MAX_PAGES)
+    return pid, text
+
 
 def _submit_chunk(
     chunk_ids: list[str],
@@ -163,35 +194,47 @@ def _submit_chunk(
     drive: DriveService,
     db: Session,
 ) -> BatchJob | None:
-    """Download PDFs, submit to Gemini Batch API, persist a BatchJob row, return it."""
+    """Download PDFs in parallel, submit to Gemini Batch API, persist a BatchJob row, return it."""
     papers_by_id = {
         str(p.id): p
         for p in db.query(Paper).filter(Paper.id.in_(chunk_ids)).all()
     }
+
+    # Download all PDFs concurrently
+    texts: dict[str, str] = {}
+    with ThreadPoolExecutor(max_workers=len(chunk_ids)) as pool:
+        futures = {
+            pool.submit(_download_paper_text, pid, papers_by_id[pid], drive): pid
+            for pid in chunk_ids
+            if pid in papers_by_id
+        }
+        for fut in as_completed(futures):
+            pid = futures[fut]
+            paper = papers_by_id[pid]
+            try:
+                _, text = fut.result()
+                texts[pid] = text
+                logger.info("downloaded PDF for paper %s (%s)", pid, paper.title[:60])
+            except DriveUploadError as exc:
+                logger.warning("skipping paper %s — drive download failed: %s", pid, exc)
+
+    # Build requests in chunk_ids order to preserve index-to-paper mapping
     inline_requests: list[dict[str, object]] = []
     resolved_ids: list[str] = []
-
     for pid in chunk_ids:
-        paper = papers_by_id.get(pid)
-        if paper is None:
+        if pid not in texts:
             continue
-        try:
-            logger.info("downloading PDF for paper %s (%s)", paper.id, paper.title[:60])
-            pdf_bytes = drive.download(paper.drive_file_id)
-            text, _ = _extract_first_pages_text(pdf_bytes, _MAX_PAGES)
-            inline_requests.append(
-                {
-                    "contents": [
-                        {
-                            "parts": [{"text": _PROMPT + "\n\n" + text}],
-                            "role": "user",
-                        }
-                    ]
-                }
-            )
-            resolved_ids.append(pid)
-        except DriveUploadError as exc:
-            logger.warning("skipping paper %s — drive download failed: %s", paper.id, exc)
+        inline_requests.append(
+            {
+                "contents": [
+                    {
+                        "parts": [{"text": _PROMPT + "\n\n" + texts[pid]}],
+                        "role": "user",
+                    }
+                ]
+            }
+        )
+        resolved_ids.append(pid)
 
     if not inline_requests:
         return None
