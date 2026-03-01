@@ -180,11 +180,9 @@ def _poll_apply_thread(
 
 # ── Core chunk functions ──────────────────────────────────────────────────────
 
-def _download_paper_text(pid: str, paper: Paper, drive: DriveService) -> tuple[str, str]:
-    """Download and extract text from a single paper's PDF. Returns (pid, text)."""
-    pdf_bytes = drive.download(paper.drive_file_id)
-    text, _ = _extract_first_pages_text(pdf_bytes, _MAX_PAGES)
-    return pid, text
+def _download_pdf_bytes(pid: str, paper: Paper, drive: DriveService) -> tuple[str, bytes]:
+    """Download raw PDF bytes for a single paper. Returns (pid, bytes)."""
+    return pid, drive.download(paper.drive_file_id)
 
 
 def _submit_chunk(
@@ -194,41 +192,43 @@ def _submit_chunk(
     drive: DriveService,
     db: Session,
 ) -> BatchJob | None:
-    """Download PDFs in parallel, submit to Gemini Batch API, persist a BatchJob row, return it."""
+    """Download PDFs in parallel, extract text sequentially, submit to Gemini Batch API."""
     papers_by_id = {
         str(p.id): p
         for p in db.query(Paper).filter(Paper.id.in_(chunk_ids)).all()
     }
 
-    # Download all PDFs concurrently
-    texts: dict[str, str] = {}
-    with ThreadPoolExecutor(max_workers=len(chunk_ids)) as pool:
+    # Download raw bytes concurrently (pure I/O — safe to parallelise)
+    pdf_bytes_by_id: dict[str, bytes] = {}
+    with ThreadPoolExecutor(max_workers=_CHUNK_SIZE) as pool:
         futures = {
-            pool.submit(_download_paper_text, pid, papers_by_id[pid], drive): pid
+            pool.submit(_download_pdf_bytes, pid, papers_by_id[pid], drive): pid
             for pid in chunk_ids
             if pid in papers_by_id
         }
         for fut in as_completed(futures):
             pid = futures[fut]
-            paper = papers_by_id[pid]
             try:
-                _, text = fut.result()
-                texts[pid] = text
-                logger.info("downloaded PDF for paper %s (%s)", pid, paper.title[:60])
+                _, pdf_bytes = fut.result()
+                pdf_bytes_by_id[pid] = pdf_bytes
             except DriveUploadError as exc:
                 logger.warning("skipping paper %s — drive download failed: %s", pid, exc)
 
+    # Extract text sequentially (pdfplumber uses C extensions — not thread-safe)
     # Build requests in chunk_ids order to preserve index-to-paper mapping
     inline_requests: list[dict[str, object]] = []
     resolved_ids: list[str] = []
     for pid in chunk_ids:
-        if pid not in texts:
+        if pid not in pdf_bytes_by_id:
             continue
+        paper = papers_by_id[pid]
+        text, _ = _extract_first_pages_text(pdf_bytes_by_id[pid], _MAX_PAGES)
+        logger.info("extracted text for paper %s (%s)", pid, paper.title[:60])
         inline_requests.append(
             {
                 "contents": [
                     {
-                        "parts": [{"text": _PROMPT + "\n\n" + texts[pid]}],
+                        "parts": [{"text": _PROMPT + "\n\n" + text}],
                         "role": "user",
                     }
                 ]
