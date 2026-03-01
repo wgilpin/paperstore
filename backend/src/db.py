@@ -131,3 +131,11 @@ def create_tables() -> None:
     with engine.connect() as conn:
         conn.execute(text(_add_batch_progress_sql))
         conn.commit()
+
+    # Add metadata_skip_reason column to papers if it was created before this column existed.
+    _add_skip_reason_sql = """
+    ALTER TABLE papers ADD COLUMN IF NOT EXISTS metadata_skip_reason TEXT;
+    """
+    with engine.connect() as conn:
+        conn.execute(text(_add_skip_reason_sql))
+        conn.commit()

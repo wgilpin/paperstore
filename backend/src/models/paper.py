@@ -28,6 +28,7 @@ class Paper(Base):
     submission_url: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
     drive_file_id: Mapped[str] = mapped_column(Text, nullable=False)
     drive_view_url: Mapped[str] = mapped_column(Text, nullable=False)
+    metadata_skip_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     added_at: Mapped[datetime] = mapped_column(nullable=False, server_default=func.now())
     # search_vector is a GENERATED ALWAYS column — created by raw DDL in create_tables().
     # server_default=FetchedValue() tells SQLAlchemy the DB owns this column;

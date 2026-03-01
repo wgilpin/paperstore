@@ -249,7 +249,10 @@ def _submit_chunk(
         try:
             text, _ = _extract_first_pages_text(pdf_bytes_by_id[pid], _MAX_PAGES)
         except Exception as exc:
-            logger.warning("skipping paper %s — text extraction failed: %s", pid, exc)
+            reason = str(exc)
+            logger.warning("skipping paper %s permanently — text extraction failed: %s", pid, exc)
+            paper.metadata_skip_reason = reason
+            db.commit()
             continue
         logger.info("extracted text for paper %s (%s)", pid, paper.title[:60])
         inline_requests.append(
@@ -345,7 +348,9 @@ def _apply_batch_results(
 
 
 def _is_eligible(paper: Paper) -> bool:
-    """Return True if the paper is missing at least one metadata field."""
+    """Return True if the paper needs metadata extraction and has not been permanently skipped."""
+    if paper.metadata_skip_reason is not None:
+        return False
     has_abstract = bool(paper.abstract and paper.abstract.strip())
     has_authors = bool(paper.authors)
     has_date = paper.published_date is not None
