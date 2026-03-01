@@ -49,6 +49,18 @@ function initPaperPage() {
     const embedUrl = paper.drive_view_url.replace(/\/view(\?.*)?$/, '/preview');
     document.getElementById('pdf-frame').src = embedUrl;
 
+    if (paper.arxiv_id) {
+      const btn = document.getElementById('alphaxiv-btn');
+      btn.href = `https://www.alphaxiv.org/abs/${paper.arxiv_id}`;
+      btn.title = 'Open on alphaXiv';
+      btn.hidden = false;
+    } else if (paper.submission_url && !paper.submission_url.startsWith('file://')) {
+      const btn = document.getElementById('source-btn');
+      btn.href = paper.submission_url;
+      btn.title = 'Open original source';
+      btn.hidden = false;
+    }
+
     const noteField = document.getElementById('note-field');
     noteField.value = paper.note ? paper.note.content : '';
     noteField.addEventListener('blur', () => saveNote(paper.id, noteField.value));
