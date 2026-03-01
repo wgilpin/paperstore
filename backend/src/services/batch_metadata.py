@@ -5,10 +5,14 @@ import logging
 import os
 import threading
 import time
+import uuid
+from collections.abc import Callable
+from datetime import UTC, datetime
 
 from google import genai
 from sqlalchemy.orm import Session
 
+from src.models.batch_job import BatchJob
 from src.models.paper import Paper
 from src.schemas.batch import BatchLoopStatus
 from src.schemas.paper import ExtractedMetadata
@@ -17,7 +21,7 @@ from src.services.gemini import _MAX_PAGES, _PROMPT, _extract_first_pages_text
 
 logger = logging.getLogger(__name__)
 
-_COST_PER_PAPER_USD = 0.005
+COST_PER_PAPER_USD = 0.005
 _CHUNK_SIZE = 20
 _POLL_INTERVAL_SECONDS = 300
 
@@ -75,6 +79,7 @@ def _loop() -> None:
     drive = DriveService()
     logger.info("batch loop started")
 
+    global _papers_done
     while is_running():
         db = session_factory()
         try:
@@ -83,11 +88,12 @@ def _loop() -> None:
                 logger.info("batch loop: no eligible papers remaining, stopping")
                 stop_loop()
                 break
-            applied = _process_chunk(chunk, client, model_name, drive, db)
-            global _papers_done
-            with _lock:
-                _papers_done += applied
-            logger.info("batch loop: chunk done, %d applied so far", _papers_done)
+            job = _submit_chunk(chunk, client, model_name, drive, db)
+            if job is not None:
+                applied = _poll_and_apply(job, client, db)
+                with _lock:
+                    _papers_done += applied
+                logger.info("batch loop: chunk done, %d applied so far", _papers_done)
         except Exception as exc:
             logger.error("batch loop: chunk failed: %s", exc)
         finally:
@@ -96,7 +102,182 @@ def _loop() -> None:
     logger.info("batch loop stopped")
 
 
-# ── Helpers (unchanged) ───────────────────────────────────────────────────────
+def resume_submitted_chunks(db: Session) -> None:
+    """On startup, re-attach to any BatchJob rows left in 'submitted' state and poll them."""
+    from sqlalchemy.orm import sessionmaker
+
+    from src.db import _get_engine
+
+    jobs = db.query(BatchJob).filter(BatchJob.state == "submitted").all()
+    if not jobs:
+        return
+
+    try:
+        client, _ = _get_gemini_client()
+    except ValueError as exc:
+        logger.error("resume: cannot get Gemini client: %s", exc)
+        return
+
+    session_factory = sessionmaker(bind=_get_engine(), autocommit=False, autoflush=False)
+
+    for job in jobs:
+        logger.info(
+            "resuming in-flight chunk %s — gemini job %s (%d papers)",
+            job.id,
+            job.gemini_job_name,
+            len(job.paper_ids),
+        )
+        threading.Thread(
+            target=_resume_job_thread,
+            args=(job.id, client, session_factory),
+            daemon=True,
+        ).start()
+
+
+def _resume_job_thread(
+    job_id: uuid.UUID,
+    client: genai.Client,
+    session_factory: Callable[[], Session],
+) -> None:
+    """Background thread: re-attach to a submitted Gemini batch and apply its results."""
+    db = session_factory()
+    try:
+        job = db.query(BatchJob).filter(BatchJob.id == job_id).first()
+        if job is None:
+            logger.error("resume thread: job %s not found in DB", job_id)
+            return
+        applied = _poll_and_apply(job, client, db)
+        logger.info("resume thread: job %s — applied %d", job_id, applied)
+    except Exception as exc:
+        logger.error("resume thread: job %s failed: %s", job_id, exc)
+    finally:
+        db.close()
+
+
+# ── Core chunk functions ──────────────────────────────────────────────────────
+
+def _submit_chunk(
+    chunk_ids: list[str],
+    client: genai.Client,
+    model_name: str,
+    drive: DriveService,
+    db: Session,
+) -> BatchJob | None:
+    """Download PDFs, submit to Gemini Batch API, persist a BatchJob row, return it."""
+    papers_by_id = {
+        str(p.id): p
+        for p in db.query(Paper).filter(Paper.id.in_(chunk_ids)).all()
+    }
+    inline_requests: list[dict[str, object]] = []
+    resolved_ids: list[str] = []
+
+    for pid in chunk_ids:
+        paper = papers_by_id.get(pid)
+        if paper is None:
+            continue
+        try:
+            logger.info("downloading PDF for paper %s (%s)", paper.id, paper.title[:60])
+            pdf_bytes = drive.download(paper.drive_file_id)
+            text, _ = _extract_first_pages_text(pdf_bytes, _MAX_PAGES)
+            inline_requests.append(
+                {
+                    "contents": [
+                        {
+                            "parts": [{"text": _PROMPT + "\n\n" + text}],
+                            "role": "user",
+                        }
+                    ]
+                }
+            )
+            resolved_ids.append(pid)
+        except DriveUploadError as exc:
+            logger.warning("skipping paper %s — drive download failed: %s", paper.id, exc)
+
+    if not inline_requests:
+        return None
+
+    logger.info("submitting Gemini chunk of %d papers", len(inline_requests))
+    batch = client.batches.create(
+        model=model_name,
+        src=inline_requests,  # type: ignore[arg-type]
+        config={"display_name": "paperstore-metadata-chunk"},
+    )
+    batch_name = batch.name or ""
+    logger.info("Gemini batch created: %s", batch_name)
+
+    job = BatchJob(
+        id=uuid.uuid4(),
+        gemini_job_name=batch_name,
+        state="submitted",
+        paper_ids=resolved_ids,
+        papers_done=0,
+    )
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+    logger.info("BatchJob %s persisted (state=submitted)", job.id)
+    return job
+
+
+def _poll_and_apply(job: BatchJob, client: genai.Client, db: Session) -> int:
+    """Poll Gemini until the batch is done, apply results, update BatchJob state."""
+    batch_name = job.gemini_job_name
+    state_name = ""
+
+    while True:
+        time.sleep(_POLL_INTERVAL_SECONDS)
+        batch = client.batches.get(name=batch_name)
+        state_name = batch.state.name if batch.state is not None else "JOB_STATE_SUCCEEDED"
+        logger.info("batch %s state: %s", batch_name, state_name)
+        if state_name not in ("JOB_STATE_PENDING", "JOB_STATE_RUNNING"):
+            break
+
+    if state_name not in ("JOB_STATE_SUCCEEDED", ""):
+        logger.warning("batch %s ended with state %s — marking failed", batch_name, state_name)
+        job.state = "failed"
+        job.completed_at = datetime.now(UTC)
+        db.commit()
+        return 0
+
+    # Fetch fresh paper objects (needed when resuming after restart)
+    papers_by_id = {
+        str(p.id): p
+        for p in db.query(Paper).filter(Paper.id.in_(job.paper_ids)).all()
+    }
+
+    responses = (batch.dest.inlined_responses if batch.dest is not None else None) or []
+    applied = 0
+    for idx, inline_response in enumerate(responses):
+        if idx >= len(job.paper_ids):
+            break
+        paper_id = job.paper_ids[idx]
+        paper = papers_by_id.get(paper_id)
+        if paper is None:
+            continue
+        if inline_response.error:
+            logger.warning("batch result error for paper %s: %s", paper_id, inline_response.error)
+            continue
+        try:
+            if inline_response.response is None:
+                continue
+            raw_text = inline_response.response.text
+            if not raw_text:
+                continue
+            meta = _parse_metadata(str(raw_text))
+            _apply_metadata(paper, meta)
+            applied += 1
+        except Exception as exc:
+            logger.warning("failed to apply metadata for paper %s: %s", paper_id, exc)
+
+    job.state = "applied"
+    job.papers_done = applied
+    job.completed_at = datetime.now(UTC)
+    db.commit()
+    logger.info("batch %s applied %d/%d papers", batch_name, applied, len(job.paper_ids))
+    return applied
+
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _is_eligible(paper: Paper) -> bool:
     """Return True if the paper is missing at least one metadata field."""
@@ -156,10 +337,12 @@ def _apply_metadata(paper: Paper, meta: ExtractedMetadata) -> None:
     """Write extracted fields to paper only if the field is currently empty."""
     from src.schemas.paper import PaperUpdateRequest
 
-    if not paper.abstract and meta.abstract:
-        paper.abstract = meta.abstract
+    if not paper.title and meta.title:
+        paper.title = meta.title
     if not paper.authors and meta.authors:
         paper.authors = meta.authors
+    if not paper.abstract and meta.abstract:
+        paper.abstract = meta.abstract
     if paper.published_date is None and meta.date:
         try:
             parsed = PaperUpdateRequest.model_validate(
@@ -174,89 +357,3 @@ def _apply_metadata(paper: Paper, meta: ExtractedMetadata) -> None:
             paper.published_date = parsed.published_date
         except Exception:
             pass
-
-
-def _process_chunk(
-    chunk_ids: list[str],
-    client: genai.Client,
-    model_name: str,
-    drive: DriveService,
-    db: Session,
-) -> int:
-    """Download, submit, poll, and apply one chunk. Returns number of papers applied."""
-    inline_requests: list[dict[str, object]] = []
-    resolved_ids: list[str] = []
-
-    for pid in chunk_ids:
-        paper = db.query(Paper).filter(Paper.id == pid).first()
-        if paper is None:
-            continue
-        try:
-            logger.info("downloading PDF for paper %s (%s)", paper.id, paper.title[:60])
-            pdf_bytes = drive.download(paper.drive_file_id)
-            text, _ = _extract_first_pages_text(pdf_bytes, _MAX_PAGES)
-            inline_requests.append(
-                {
-                    "contents": [
-                        {
-                            "parts": [{"text": _PROMPT + "\n\n" + text}],
-                            "role": "user",
-                        }
-                    ]
-                }
-            )
-            resolved_ids.append(str(paper.id))
-        except DriveUploadError as exc:
-            logger.warning("skipping paper %s — drive download failed: %s", paper.id, exc)
-
-    if not inline_requests:
-        return 0
-
-    logger.info("submitting Gemini chunk of %d papers", len(inline_requests))
-    batch = client.batches.create(
-        model=model_name,
-        src=inline_requests,  # type: ignore[arg-type]
-        config={"display_name": "paperstore-metadata-chunk"},
-    )
-    batch_name = batch.name or ""
-    logger.info("chunk batch job created: %s", batch_name)
-
-    # Poll until done
-    while True:
-        time.sleep(_POLL_INTERVAL_SECONDS)
-        batch = client.batches.get(name=batch_name)
-        state_name = batch.state.name if batch.state is not None else ""
-        logger.info("chunk %s state: %s", batch.name, state_name)
-        if state_name not in ("JOB_STATE_PENDING", "JOB_STATE_RUNNING"):
-            break
-
-    if state_name != "JOB_STATE_SUCCEEDED":
-        logger.warning("chunk %s ended with state %s", batch.name, state_name)
-        return 0
-
-    responses = (batch.dest.inlined_responses if batch.dest is not None else None) or []
-    applied = 0
-    for idx, inline_response in enumerate(responses):
-        if idx >= len(resolved_ids):
-            break
-        paper_id = resolved_ids[idx]
-        paper = db.query(Paper).filter(Paper.id == paper_id).first()
-        if paper is None:
-            continue
-        if inline_response.error:
-            logger.warning("chunk result error for paper %s: %s", paper_id, inline_response.error)
-            continue
-        try:
-            if inline_response.response is None:
-                continue
-            raw_text = inline_response.response.text
-            if not raw_text:
-                continue
-            meta = _parse_metadata(str(raw_text))
-            _apply_metadata(paper, meta)
-            applied += 1
-        except Exception as exc:
-            logger.warning("failed to apply metadata for paper %s: %s", paper_id, exc)
-
-    db.commit()
-    return applied

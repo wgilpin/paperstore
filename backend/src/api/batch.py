@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from src.db import get_session
 from src.schemas.batch import BatchLoopStatus, EligibleCountResponse
 from src.services.batch_metadata import (
-    _COST_PER_PAPER_USD,
+    COST_PER_PAPER_USD,
     count_eligible_papers,
     get_status,
     start_loop,
@@ -24,7 +24,7 @@ router = APIRouter()
 def eligible_count(db: Session = Depends(get_session)) -> EligibleCountResponse:
     """Return the number of papers eligible for metadata extraction and estimated cost."""
     n = count_eligible_papers(db)
-    return EligibleCountResponse(count=n, estimated_cost_usd=round(n * _COST_PER_PAPER_USD, 4))
+    return EligibleCountResponse(count=n, estimated_cost_usd=round(n * COST_PER_PAPER_USD, 4))
 
 
 @router.get("/metadata/status")

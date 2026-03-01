@@ -22,6 +22,7 @@ from src.schemas.paper import (
     PaperSummary,
     PaperUpdateRequest,
 )
+from src.services.batch_metadata import _apply_metadata, _is_eligible
 from src.services.drive import DriveUploadError
 from src.services.gemini import GeminiService
 from src.services.ingestion import DuplicateError, IngestionService
@@ -33,39 +34,21 @@ router = APIRouter()
 
 
 def _enrich_paper_async(paper_id: str, drive_file_id: str) -> None:
-    """Spawn a daemon thread to extract metadata and apply it to empty fields."""
+    """Spawn a daemon thread to extract metadata via Gemini and apply it to empty fields."""
     def _run() -> None:
-        from sqlalchemy.orm import sessionmaker as _sessionmaker
+        from sqlalchemy.orm import sessionmaker
 
         from src.db import _get_engine
-        db = _sessionmaker(bind=_get_engine(), autocommit=False, autoflush=False)()
+        from src.services.drive import DriveService
+
+        db = sessionmaker(bind=_get_engine(), autocommit=False, autoflush=False)()
         try:
-            from src.services.drive import DriveService
             pdf_bytes = DriveService().download(drive_file_id)
             metadata = GeminiService().extract_metadata(pdf_bytes)
             paper = db.query(Paper).filter(Paper.id == paper_id).first()
             if paper is None:
                 return
-            if not paper.abstract and metadata.abstract:
-                paper.abstract = metadata.abstract
-            if not paper.authors and metadata.authors:
-                paper.authors = metadata.authors
-            if paper.published_date is None and metadata.date:
-                try:
-                    parsed = PaperUpdateRequest.model_validate(
-                        {
-                            "title": paper.title,
-                            "authors": paper.authors,
-                            "published_date": metadata.date,
-                            "abstract": paper.abstract,
-                            "tags": [],
-                        }
-                    )
-                    paper.published_date = parsed.published_date
-                except Exception:
-                    pass
-            if not paper.title and metadata.title:
-                paper.title = metadata.title
+            _apply_metadata(paper, metadata)
             db.commit()
         except Exception:
             logger.exception("Background metadata extraction failed for paper %s", paper_id)
@@ -110,7 +93,7 @@ def submit_paper(
     except DriveUploadError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
-    if not (paper.title and paper.authors and paper.published_date):
+    if _is_eligible(paper):
         _enrich_paper_async(str(paper.id), paper.drive_file_id)
 
     note = db.query(Note).filter(Note.paper_id == paper.id).first()

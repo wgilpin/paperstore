@@ -91,6 +91,14 @@ app.add_middleware(
 @app.on_event("startup")
 def startup() -> None:
     create_tables()
+    from src.db import get_session
+    from src.services.batch_metadata import resume_submitted_chunks
+
+    db = next(get_session())
+    try:
+        resume_submitted_chunks(db)
+    finally:
+        db.close()
 
 
 @app.exception_handler(Exception)
