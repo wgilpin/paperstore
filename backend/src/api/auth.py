@@ -42,7 +42,10 @@ def login(request: Request) -> RedirectResponse:
 def callback(request: Request) -> RedirectResponse:
     state = request.session.pop("oauth_state", None)
     flow = _build_flow(state=state)
-    flow.fetch_token(authorization_response=str(request.url))
+    redirect_uri = os.environ.get("GOOGLE_REDIRECT_URI", "http://localhost:8000/auth/callback")
+    scheme = redirect_uri.split("://")[0]
+    callback_url = str(request.url).replace("http://", f"{scheme}://", 1)
+    flow.fetch_token(authorization_response=callback_url)
     creds = flow.credentials
     token_path = Path(os.environ.get("GOOGLE_TOKEN_PATH", "token.json"))
     token_path.parent.mkdir(parents=True, exist_ok=True)
