@@ -11,6 +11,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime
 
 from google import genai
+from google.genai import types as genai_types
+from google.genai.types import JOB_STATES_SUCCEEDED
 from sqlalchemy.orm import Session
 
 from src.models.batch_job import BatchJob
@@ -30,6 +32,7 @@ _POLL_INTERVAL_SECONDS = 300
 
 _running = False
 _papers_done = 0
+_poll_thread: threading.Thread | None = None
 _lock = threading.Lock()
 
 
@@ -99,11 +102,7 @@ def _loop() -> None:
                 break
             job = _submit_chunk(chunk, client, model_name, db)
             if job is not None:
-                threading.Thread(
-                    target=_poll_apply_thread,
-                    args=(job.id, client, session_factory),
-                    daemon=True,
-                ).start()
+                _ensure_poll_thread(client, session_factory)
         except Exception as exc:
             logger.error("batch loop: chunk failed: %s", exc)
         finally:
@@ -127,66 +126,88 @@ def resume_submitted_chunks(db: Session) -> None:
         logger.error("resume: cannot get Gemini client: %s", exc)
         return
 
+    logger.info("resume: %d in-flight jobs found — starting poll thread", len(jobs))
     session_factory = sessionmaker(bind=_get_engine(), autocommit=False, autoflush=False)
+    _ensure_poll_thread(client, session_factory)
 
-    for job in jobs:
-        logger.info(
-            "resuming in-flight chunk %s — gemini job %s (%d papers)",
-            job.id,
-            job.gemini_job_name,
-            len(job.paper_ids),
-        )
-        threading.Thread(
-            target=_resume_job_thread,
-            args=(job.id, client, session_factory),
+
+def _ensure_poll_thread(
+    client: genai.Client,
+    session_factory: Callable[[], Session],
+) -> None:
+    """Start the shared poll thread if it is not already running."""
+    global _poll_thread
+    with _lock:
+        if _poll_thread is not None and _poll_thread.is_alive():
+            return
+        t = threading.Thread(
+            target=_poll_loop_thread,
+            args=(client, session_factory),
             daemon=True,
-        ).start()
+        )
+        _poll_thread = t
+    t.start()
 
 
-def _resume_job_thread(
-    job_id: uuid.UUID,
+def _poll_loop_thread(
     client: genai.Client,
     session_factory: Callable[[], Session],
 ) -> None:
-    """Background thread: re-attach to a submitted Gemini batch and apply its results."""
-    db = session_factory()
-    try:
-        job = db.query(BatchJob).filter(BatchJob.id == job_id).first()
-        if job is None:
-            logger.error("resume thread: job %s not found in DB", job_id)
-            return
-        applied = _poll_and_apply(job, client, db)
-        logger.info("resume thread: job %s — applied %d", job_id, applied)
-    except Exception as exc:
-        logger.error("resume thread: job %s failed: %s", job_id, exc)
-    finally:
-        db.close()
-
-
-def _poll_apply_thread(
-    job_id: uuid.UUID,
-    client: genai.Client,
-    session_factory: Callable[[], Session],
-) -> None:
-    """Background thread: poll a newly submitted batch and apply its results."""
+    """Single background thread: poll all submitted batch jobs on each tick and apply results."""
     global _papers_done
-    db = session_factory()
+    logger.info("poll loop started")
     try:
-        job = db.query(BatchJob).filter(BatchJob.id == job_id).first()
-        if job is None:
-            logger.error("poll thread: job %s not found in DB", job_id)
-            return
-        applied = _poll_and_apply(job, client, db)
-        with _lock:
-            _papers_done += applied
-        logger.info("poll thread: job %s — applied %d", job_id, applied)
+        while True:
+            time.sleep(_POLL_INTERVAL_SECONDS)
+            db = session_factory()
+            try:
+                jobs = db.query(BatchJob).filter(BatchJob.state == "submitted").all()
+                if not jobs:
+                    logger.info("poll loop: no submitted jobs remain, stopping")
+                    break
+
+                # Fetch all batch statuses concurrently (pure I/O)
+                with ThreadPoolExecutor(max_workers=len(jobs)) as pool:
+                    batch_futures = {
+                        pool.submit(client.batches.get, name=job.gemini_job_name): job
+                        for job in jobs
+                    }
+                    for fut in as_completed(batch_futures):
+                        job = batch_futures[fut]
+                        try:
+                            batch = fut.result()
+                        except Exception as exc:
+                            logger.error(
+                                "poll loop: failed to fetch batch %s: %s",
+                                job.gemini_job_name,
+                                exc,
+                            )
+                            continue
+                        logger.info(
+                            "batch %s state: %s",
+                            job.gemini_job_name,
+                            batch.state.name if batch.state is not None else "unknown",
+                        )
+                        if not batch.done:
+                            continue
+                        try:
+                            applied = _apply_batch_results(job, batch, db)
+                            with _lock:
+                                _papers_done += applied
+                        except Exception as exc:
+                            logger.error("poll loop: failed to apply job %s: %s", job.id, exc)
+            except Exception as exc:
+                logger.error("poll loop: tick failed: %s", exc)
+            finally:
+                db.close()
     except Exception as exc:
-        logger.error("poll thread: job %s failed: %s", job_id, exc)
+        logger.error("poll loop: unexpected error: %s", exc)
     finally:
-        db.close()
+        logger.info("poll loop stopped")
 
 
 # ── Core chunk functions ──────────────────────────────────────────────────────
+
 
 def _download_pdf_bytes(pid: str, paper: Paper) -> tuple[str, bytes]:
     """Download raw PDF bytes for a single paper using a thread-local DriveService."""
@@ -200,18 +221,14 @@ def _submit_chunk(
     db: Session,
 ) -> BatchJob | None:
     """Download PDFs in parallel, extract text sequentially, submit to Gemini Batch API."""
-    papers_by_id = {
-        str(p.id): p
-        for p in db.query(Paper).filter(Paper.id.in_(chunk_ids)).all()
-    }
+    papers_by_id = {str(p.id): p for p in db.query(Paper).filter(Paper.id.in_(chunk_ids)).all()}
 
     # Download raw bytes concurrently (pure I/O — safe to parallelise)
     pdf_bytes_by_id: dict[str, bytes] = {}
-    with ThreadPoolExecutor(max_workers=_CHUNK_SIZE) as pool:
+    eligible_ids = [pid for pid in chunk_ids if pid in papers_by_id]
+    with ThreadPoolExecutor(max_workers=len(eligible_ids) or 1) as pool:
         futures = {
-            pool.submit(_download_pdf_bytes, pid, papers_by_id[pid]): pid
-            for pid in chunk_ids
-            if pid in papers_by_id
+            pool.submit(_download_pdf_bytes, pid, papers_by_id[pid]): pid for pid in eligible_ids
         }
         for fut in as_completed(futures):
             pid = futures[fut]
@@ -229,7 +246,11 @@ def _submit_chunk(
         if pid not in pdf_bytes_by_id:
             continue
         paper = papers_by_id[pid]
-        text, _ = _extract_first_pages_text(pdf_bytes_by_id[pid], _MAX_PAGES)
+        try:
+            text, _ = _extract_first_pages_text(pdf_bytes_by_id[pid], _MAX_PAGES)
+        except Exception as exc:
+            logger.warning("skipping paper %s — text extraction failed: %s", pid, exc)
+            continue
         logger.info("extracted text for paper %s (%s)", pid, paper.title[:60])
         inline_requests.append(
             {
@@ -269,20 +290,16 @@ def _submit_chunk(
     return job
 
 
-def _poll_and_apply(job: BatchJob, client: genai.Client, db: Session) -> int:
-    """Poll Gemini until the batch is done, apply results, update BatchJob state."""
+def _apply_batch_results(
+    job: BatchJob,
+    batch: genai_types.BatchJob,
+    db: Session,
+) -> int:
+    """Apply completed batch results to papers, update BatchJob state. Returns count applied."""
     batch_name = job.gemini_job_name
-    state_name = ""
+    state_name = batch.state.name if batch.state is not None else "unknown"
 
-    while True:
-        time.sleep(_POLL_INTERVAL_SECONDS)
-        batch = client.batches.get(name=batch_name)
-        state_name = batch.state.name if batch.state is not None else "JOB_STATE_SUCCEEDED"
-        logger.info("batch %s state: %s", batch_name, state_name)
-        if state_name not in ("JOB_STATE_PENDING", "JOB_STATE_RUNNING"):
-            break
-
-    if state_name not in ("JOB_STATE_SUCCEEDED", ""):
+    if batch.state is None or state_name not in JOB_STATES_SUCCEEDED:
         logger.warning("batch %s ended with state %s — marking failed", batch_name, state_name)
         job.state = "failed"
         job.completed_at = datetime.now(UTC)
@@ -290,10 +307,7 @@ def _poll_and_apply(job: BatchJob, client: genai.Client, db: Session) -> int:
         return 0
 
     # Fetch fresh paper objects (needed when resuming after restart)
-    papers_by_id = {
-        str(p.id): p
-        for p in db.query(Paper).filter(Paper.id.in_(job.paper_ids)).all()
-    }
+    papers_by_id = {str(p.id): p for p in db.query(Paper).filter(Paper.id.in_(job.paper_ids)).all()}
 
     responses = (batch.dest.inlined_responses if batch.dest is not None else None) or []
     applied = 0
@@ -328,6 +342,7 @@ def _poll_and_apply(job: BatchJob, client: genai.Client, db: Session) -> int:
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
 
 def _is_eligible(paper: Paper) -> bool:
     """Return True if the paper is missing at least one metadata field."""
