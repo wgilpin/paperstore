@@ -48,9 +48,18 @@ function initIndexPage() {
 
   // ── Batch metadata enrichment ────────────────────────────────────────────
 
-  function setEnrichStatus(msg, cls) {
-    enrichStatus.textContent = msg;
-    enrichStatus.className = cls || '';
+  function setEnrichUI(running, papersDone) {
+    if (running) {
+      enrichBtn.textContent = 'Stop metadata search';
+      enrichBtn.classList.add('active');
+      enrichStatus.textContent = papersDone > 0 ? `${papersDone} applied so far…` : 'Running…';
+      enrichStatus.className = 'running';
+    } else {
+      enrichBtn.textContent = 'Find missing metadata';
+      enrichBtn.classList.remove('active');
+      enrichStatus.textContent = papersDone > 0 ? `Done — ${papersDone} applied.` : '';
+      enrichStatus.className = '';
+    }
   }
 
   async function checkBatchStatus() {
@@ -58,74 +67,25 @@ function initIndexPage() {
       const res = await fetch(`${API}/batch/metadata/status`);
       if (!res.ok) return;
       const data = await res.json();
-      const job = data.job;
-      if (!job) {
-        enrichBtn.disabled = false;
-        setEnrichStatus('', '');
-        return;
-      }
-      if (job.state === 'preparing' || job.state === 'running') {
-        enrichBtn.disabled = true;
-        const progress = job.state === 'preparing'
-          ? `Preparing ${job.paper_count} paper${job.paper_count !== 1 ? 's' : ''}…`
-          : `Processing ${job.papers_done}/${job.paper_count} papers…`;
-        setEnrichStatus(progress, 'running');
-      } else if (job.state === 'applied') {
-        enrichBtn.disabled = false;
-        setEnrichStatus(`Metadata applied for ${job.papers_done} of ${job.paper_count} paper${job.paper_count !== 1 ? 's' : ''}.`, 'success');
-        loadPapers();
-      } else if (job.state === 'failed') {
-        enrichBtn.disabled = false;
-        setEnrichStatus('Batch job failed. Try again.', 'error');
-      } else {
-        enrichBtn.disabled = false;
-        setEnrichStatus('', '');
-      }
+      const s = data.status;
+      if (s) setEnrichUI(s.running, s.papers_done);
     } catch {
-      // Non-fatal — status bar stays blank
+      // Non-fatal — button stays in default state
     }
   }
 
   enrichBtn?.addEventListener('click', async () => {
-    let count = 0;
-    let costUsd = 0;
+    const isRunning = enrichBtn.classList.contains('active');
+    const endpoint = isRunning ? '/batch/metadata/stop' : '/batch/metadata/start';
     try {
-      const res = await fetch(`${API}/batch/metadata/eligible-count`);
-      if (res.ok) {
-        const data = await res.json();
-        count = data.count;
-        costUsd = data.estimated_cost_usd;
-      }
-    } catch { /* ignore — show generic confirm */ }
-
-    if (count === 0) {
-      setEnrichStatus('All papers already have metadata.', 'success');
-      return;
-    }
-
-    const costStr = costUsd.toFixed(3);
-    const confirmed = window.confirm(
-      `This will extract metadata (abstract, authors, date) for ${count} paper${count !== 1 ? 's' : ''} using the Gemini API.\n\nEstimated cost: $${costStr} (~$0.005 per paper).\n\nThe job runs in the background and results are applied automatically. Continue?`
-    );
-    if (!confirmed) return;
-
-    enrichBtn.disabled = true;
-    setEnrichStatus('Starting batch job…', 'running');
-    try {
-      const res = await fetch(`${API}/batch/metadata`, { method: 'POST' });
+      const res = await fetch(`${API}${endpoint}`, { method: 'POST' });
+      if (!res.ok) return;
       const data = await res.json();
-      if (res.ok) {
-        const job = data.job;
-        setEnrichStatus(`Batch job started (${job.paper_count} paper${job.paper_count !== 1 ? 's' : ''}). Results will appear here when ready.`, 'running');
-      } else if (res.status === 409) {
-        setEnrichStatus('A batch job is already running.', 'running');
-      } else {
-        enrichBtn.disabled = false;
-        setEnrichStatus(data.detail || 'Failed to start batch job.', 'error');
-      }
+      const s = data.status;
+      if (s) setEnrichUI(s.running, s.papers_done);
     } catch {
-      enrichBtn.disabled = false;
-      setEnrichStatus('Network error — is the server running?', 'error');
+      enrichStatus.textContent = 'Network error — is the server running?';
+      enrichStatus.className = 'error';
     }
   });
 

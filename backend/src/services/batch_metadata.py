@@ -1,19 +1,16 @@
-"""Batch metadata extraction service using the Gemini Batch API."""
+"""Batch metadata extraction service — background loop using the Gemini Batch API."""
 
 import json
 import logging
 import os
 import threading
 import time
-import uuid
-from datetime import UTC, datetime
 
 from google import genai
 from sqlalchemy.orm import Session
 
-from src.models.batch_job import BatchJob
 from src.models.paper import Paper
-from src.schemas.batch import BatchJobStatus
+from src.schemas.batch import BatchLoopStatus
 from src.schemas.paper import ExtractedMetadata
 from src.services.drive import DriveService, DriveUploadError
 from src.services.gemini import _MAX_PAGES, _PROMPT, _extract_first_pages_text
@@ -24,6 +21,82 @@ _COST_PER_PAPER_USD = 0.005
 _CHUNK_SIZE = 20
 _POLL_INTERVAL_SECONDS = 300
 
+# ── Module-level loop state ───────────────────────────────────────────────────
+
+_running = False
+_papers_done = 0
+_lock = threading.Lock()
+
+
+def is_running() -> bool:
+    with _lock:
+        return _running
+
+
+def get_status() -> BatchLoopStatus:
+    with _lock:
+        return BatchLoopStatus(running=_running, papers_done=_papers_done)
+
+
+def start_loop() -> BatchLoopStatus:
+    """Start the background loop. No-op if already running."""
+    global _running, _papers_done
+    with _lock:
+        if _running:
+            return BatchLoopStatus(running=True, papers_done=_papers_done)
+        _running = True
+        _papers_done = 0
+    threading.Thread(target=_loop, daemon=True).start()
+    return BatchLoopStatus(running=True, papers_done=0)
+
+
+def stop_loop() -> BatchLoopStatus:
+    global _running
+    with _lock:
+        _running = False
+        return BatchLoopStatus(running=False, papers_done=_papers_done)
+
+
+def _loop() -> None:
+    """Continuously process eligible papers in chunks until stopped or exhausted."""
+    from sqlalchemy.orm import sessionmaker
+
+    from src.db import _get_engine
+
+    session_factory = sessionmaker(bind=_get_engine(), autocommit=False, autoflush=False)
+
+    try:
+        client, model_name = _get_gemini_client()
+    except ValueError as exc:
+        logger.error("batch loop: %s", exc)
+        stop_loop()
+        return
+
+    drive = DriveService()
+    logger.info("batch loop started")
+
+    while is_running():
+        db = session_factory()
+        try:
+            chunk = [str(p.id) for p in db.query(Paper).all() if _is_eligible(p)][:_CHUNK_SIZE]
+            if not chunk:
+                logger.info("batch loop: no eligible papers remaining, stopping")
+                stop_loop()
+                break
+            applied = _process_chunk(chunk, client, model_name, drive, db)
+            global _papers_done
+            with _lock:
+                _papers_done += applied
+            logger.info("batch loop: chunk done, %d applied so far", _papers_done)
+        except Exception as exc:
+            logger.error("batch loop: chunk failed: %s", exc)
+        finally:
+            db.close()
+
+    logger.info("batch loop stopped")
+
+
+# ── Helpers (unchanged) ───────────────────────────────────────────────────────
 
 def _is_eligible(paper: Paper) -> bool:
     """Return True if the paper is missing at least one metadata field."""
@@ -47,27 +120,6 @@ def _get_gemini_client() -> tuple[genai.Client, str]:
     if not model_name:
         raise ValueError("GEMINI_PDF_MODEL environment variable is not set")
     return genai.Client(api_key=api_key), model_name
-
-
-def _active_job(db: Session) -> BatchJob | None:
-    """Return the most recent in-progress job (preparing or running), or None."""
-    return (
-        db.query(BatchJob)
-        .filter(BatchJob.state.in_(["preparing", "running"]))
-        .order_by(BatchJob.created_at.desc())
-        .first()
-    )
-
-
-def _job_to_status(job: BatchJob) -> BatchJobStatus:
-    return BatchJobStatus(
-        id=job.id,
-        state=job.state,
-        paper_count=len(job.paper_ids),
-        papers_done=job.papers_done,
-        created_at=job.created_at,
-        completed_at=job.completed_at,
-    )
 
 
 def _parse_metadata(raw_text: str) -> ExtractedMetadata:
@@ -208,156 +260,3 @@ def _process_chunk(
 
     db.commit()
     return applied
-
-
-def _run_chunked_batches(job_id: uuid.UUID, paper_ids: list[str]) -> None:
-    """Process all paper IDs in chunks of _CHUNK_SIZE, updating progress in DB."""
-    from sqlalchemy.orm import sessionmaker
-
-    from src.db import _get_engine
-
-    engine = _get_engine()
-    SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
-    db = SessionLocal()
-
-    try:
-        job = db.query(BatchJob).filter(BatchJob.id == job_id).first()
-        if job is None:
-            logger.error("background thread: job %s not found", job_id)
-            return
-
-        try:
-            client, model_name = _get_gemini_client()
-        except ValueError as exc:
-            logger.error("background thread: %s", exc)
-            job.state = "failed"
-            job.completed_at = datetime.now(UTC)
-            db.commit()
-            return
-
-        drive = DriveService()
-        job.state = "running"
-        db.commit()
-
-        chunks = [paper_ids[i : i + _CHUNK_SIZE] for i in range(0, len(paper_ids), _CHUNK_SIZE)]
-        logger.info("processing %d papers in %d chunks", len(paper_ids), len(chunks))
-
-        for chunk_num, chunk in enumerate(chunks, 1):
-            logger.info("processing chunk %d/%d", chunk_num, len(chunks))
-            try:
-                applied = _process_chunk(chunk, client, model_name, drive, db)
-                job = db.query(BatchJob).filter(BatchJob.id == job_id).first()
-                if job is None:
-                    return
-                job.papers_done = min(job.papers_done + applied, len(paper_ids))
-                db.commit()
-                logger.info("chunk %d done — %d applied so far", chunk_num, job.papers_done)
-            except Exception as exc:
-                logger.error("chunk %d failed: %s", chunk_num, exc)
-                # Continue to next chunk on error
-
-        job = db.query(BatchJob).filter(BatchJob.id == job_id).first()
-        if job:
-            job.state = "applied"
-            job.completed_at = datetime.now(UTC)
-            db.commit()
-        logger.info("all chunks complete for job %s", job_id)
-
-    except Exception as exc:
-        logger.error("background thread: unexpected error: %s", exc)
-        try:
-            job = db.query(BatchJob).filter(BatchJob.id == job_id).first()
-            if job:
-                job.state = "failed"
-                job.completed_at = datetime.now(UTC)
-                db.commit()
-        except Exception:
-            pass
-    finally:
-        db.close()
-
-
-def start_batch_job(db: Session) -> BatchJobStatus:
-    """Create a batch job row and kick off chunked processing in a background thread.
-
-    Returns immediately with state="preparing".
-    Raises ValueError if Gemini env vars are missing or no eligible papers exist.
-    Raises RuntimeError if a job is already active.
-    """
-    if _active_job(db) is not None:
-        raise RuntimeError("A batch job is already active")
-
-    papers: list[Paper] = [p for p in db.query(Paper).all() if _is_eligible(p)]
-    if not papers:
-        raise ValueError("No papers need metadata extraction")
-
-    # Validate env vars before creating the job row
-    _get_gemini_client()
-
-    paper_ids = [str(p.id) for p in papers]
-
-    job = BatchJob(
-        id=uuid.uuid4(),
-        gemini_job_name="",
-        state="preparing",
-        paper_ids=paper_ids,
-        papers_done=0,
-    )
-    db.add(job)
-    db.commit()
-    db.refresh(job)
-
-    threading.Thread(
-        target=_run_chunked_batches,
-        args=(job.id, paper_ids),
-        daemon=True,
-    ).start()
-
-    return _job_to_status(job)
-
-
-def resume_interrupted_job(db: Session) -> None:
-    """If a job was left in 'running' state (server restart), re-spawn its thread."""
-    job = (
-        db.query(BatchJob)
-        .filter(BatchJob.state == "running")
-        .order_by(BatchJob.created_at.desc())
-        .first()
-    )
-    if job is None:
-        return
-    logger.info("resuming interrupted batch job %s (%d papers)", job.id, len(job.paper_ids))
-    threading.Thread(
-        target=_run_chunked_batches,
-        args=(job.id, job.paper_ids),
-        daemon=True,
-    ).start()
-
-
-def check_and_apply_batch(db: Session) -> BatchJobStatus | None:
-    """Return the status of the active batch job, or None if there is none.
-
-    The background thread handles all Gemini polling and result application,
-    so this just reads current DB state. If a job is stuck in 'preparing' for
-    >10 minutes (thread died on redeploy), it is marked failed.
-    """
-    job = _active_job(db)
-    if job is None:
-        # Also surface recently-completed jobs so the UI can show the result
-        job = (
-            db.query(BatchJob)
-            .filter(BatchJob.state.in_(["applied", "failed"]))
-            .order_by(BatchJob.created_at.desc())
-            .first()
-        )
-        return _job_to_status(job) if job else None
-
-    if job.state == "preparing":
-        age = datetime.now(UTC) - job.created_at.replace(tzinfo=UTC)
-        if age.total_seconds() > 600:
-            logger.warning("job %s stuck in preparing >10 min — marking failed", job.id)
-            job.state = "failed"
-            job.completed_at = datetime.now(UTC)
-            db.commit()
-
-    return _job_to_status(job)
