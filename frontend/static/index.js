@@ -48,27 +48,30 @@ function initIndexPage() {
 
   // ── Batch metadata enrichment ────────────────────────────────────────────
 
-  function setEnrichUI(running, papersDone) {
+  function setEnrichUI(running, eligibleCount) {
     if (running) {
       enrichBtn.textContent = 'Stop metadata search';
       enrichBtn.classList.add('active');
-      enrichStatus.textContent = papersDone > 0 ? `${papersDone} applied so far…` : 'Running…';
+      enrichStatus.textContent = eligibleCount != null ? `${eligibleCount} still to process…` : 'Running…';
       enrichStatus.className = 'running';
     } else {
       enrichBtn.textContent = 'Find missing metadata';
       enrichBtn.classList.remove('active');
-      enrichStatus.textContent = papersDone > 0 ? `Done — ${papersDone} applied.` : '';
+      enrichStatus.textContent = eligibleCount === 0 ? 'Done — all papers processed.' : '';
       enrichStatus.className = '';
     }
   }
 
   async function checkBatchStatus() {
     try {
-      const res = await fetch(`${API}/batch/metadata/status`);
-      if (!res.ok) return;
-      const data = await res.json();
-      const s = data.status;
-      if (s) setEnrichUI(s.running, s.papers_done);
+      const [statusRes, countRes] = await Promise.all([
+        fetch(`${API}/batch/metadata/status`),
+        fetch(`${API}/batch/metadata/eligible-count`),
+      ]);
+      if (!statusRes.ok) return;
+      const s = (await statusRes.json()).status;
+      const eligibleCount = countRes.ok ? (await countRes.json()).count : null;
+      if (s) setEnrichUI(s.running, eligibleCount);
     } catch {
       // Non-fatal — button stays in default state
     }
@@ -80,9 +83,8 @@ function initIndexPage() {
     try {
       const res = await fetch(`${API}${endpoint}`, { method: 'POST' });
       if (!res.ok) return;
-      const data = await res.json();
-      const s = data.status;
-      if (s) setEnrichUI(s.running, s.papers_done);
+      const s = (await res.json()).status;
+      if (s) checkBatchStatus();
     } catch {
       enrichStatus.textContent = 'Network error — is the server running?';
       enrichStatus.className = 'error';
