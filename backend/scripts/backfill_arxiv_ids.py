@@ -33,14 +33,24 @@ _pre_args, _ = _pre.parse_known_args()
 os.environ["DATABASE_URL"] = _pre_args.db_url
 
 import arxiv  # noqa: E402
+from sqlalchemy.orm import sessionmaker  # noqa: E402
 
-from src.db import get_session  # noqa: E402
+from src.db import _get_engine  # noqa: E402
 from src.models.paper import Paper  # noqa: E402
+from src.models.paper_tag import paper_tags  # noqa: E402, F401
+from src.models.tag import Tag  # noqa: E402, F401
 from src.services.arxiv_client import extract_arxiv_id  # noqa: E402
 
 
+def _make_session():  # type: ignore[return]
+    engine = _get_engine()
+    factory = sessionmaker(bind=engine, autocommit=False, autoflush=False)
+    return factory()
+
+
 def _normalise(title: str) -> str:
-    """Lowercase, strip accents, collapse whitespace for comparison."""
+    """Lowercase, strip accents, normalise quotes, collapse whitespace."""
+    title = title.replace("\u2019", "'").replace("\u2018", "'")  # curly apostrophes
     nfkd = unicodedata.normalize("NFKD", title)
     ascii_title = "".join(c for c in nfkd if not unicodedata.combining(c))
     return " ".join(ascii_title.lower().split())
@@ -80,7 +90,7 @@ def main() -> None:
     if dry_run:
         print("DRY RUN — no changes will be written.\n")
 
-    db = get_session()
+    db = _make_session()
     try:
         papers: list[Paper] = db.query(Paper).filter(Paper.arxiv_id.is_(None)).all()
     finally:
@@ -102,7 +112,9 @@ def main() -> None:
             continue
 
         arxiv_id, matched_title = result
-        if _normalise(matched_title) != _normalise(paper.title):
+        norm_db = _normalise(paper.title)
+        norm_ax = _normalise(matched_title)
+        if norm_db != norm_ax and not norm_ax.startswith(norm_db):
             print(f"  MISMATCH      {paper.title[:60]!r}")
             print(f"                ≠ {matched_title[:60]!r}")
             mismatch += 1
@@ -113,8 +125,13 @@ def main() -> None:
             updated += 1
             continue
 
-        db = get_session()
+        db = _make_session()
         try:
+            duplicate = db.query(Paper).filter(Paper.arxiv_id == arxiv_id).first()
+            if duplicate is not None:
+                print(f"  DUPLICATE     {paper.title[:50]!r}  →  {arxiv_id} (on {duplicate.id})")
+                mismatch += 1
+                continue
             db_paper = db.query(Paper).filter(Paper.id == paper.id).one()
             db_paper.arxiv_id = arxiv_id
             db.commit()
