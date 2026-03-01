@@ -82,7 +82,17 @@ def _loop() -> None:
     while is_running():
         db = session_factory()
         try:
-            chunk = [str(p.id) for p in db.query(Paper).all() if _is_eligible(p)][:_CHUNK_SIZE]
+            # Exclude papers already covered by an in-flight batch (survives restarts)
+            in_flight: set[str] = {
+                pid
+                for job in db.query(BatchJob).filter(BatchJob.state == "submitted").all()
+                for pid in job.paper_ids
+            }
+            chunk = [
+                str(p.id)
+                for p in db.query(Paper).all()
+                if _is_eligible(p) and str(p.id) not in in_flight
+            ][:_CHUNK_SIZE]
             if not chunk:
                 logger.info("batch loop: no eligible papers remaining, stopping")
                 stop_loop()
