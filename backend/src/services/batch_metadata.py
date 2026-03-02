@@ -403,11 +403,16 @@ def _parse_metadata(raw_text: str) -> ExtractedMetadata:
     )
 
 
-def _apply_metadata(paper: Paper, meta: ExtractedMetadata) -> None:
-    """Write extracted fields to paper only if the field is currently empty."""
+def _apply_metadata(paper: Paper, meta: ExtractedMetadata, *, overwrite_title: bool = False) -> None:
+    """Write extracted fields to paper only if the field is currently empty.
+
+    If overwrite_title is True, replace the title even if one already exists
+    (used during initial ingestion where the pre-existing title is a heuristic
+    placeholder rather than a user-edited value).
+    """
     from src.schemas.paper import PaperUpdateRequest
 
-    if not paper.title and meta.title:
+    if meta.title and (overwrite_title or not paper.title):
         paper.title = meta.title
     if not paper.authors and meta.authors:
         paper.authors = meta.authors

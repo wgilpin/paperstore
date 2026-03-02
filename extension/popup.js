@@ -98,7 +98,7 @@ async function submitPdf(tabUrl) {
       addBtn.disabled = true;
       try {
         const result = await submitPdf(url);
-        setStatus(result, result === "success" ? "PDF added to your library!" : "Already in your library.");
+        setStatus(result, result === "success" ? "PDF added! Extracting metadata\u2026" : "Already in your library.");
       } catch (err) {
         setStatus("error", `Error: ${err.message}`);
         addBtn.disabled = false;

@@ -49,7 +49,7 @@ def _enrich_paper_async(paper_id: str, drive_file_id: str) -> None:
             paper = db.query(Paper).filter(Paper.id == paper_id).first()
             if paper is None:
                 return
-            _apply_metadata(paper, metadata)
+            _apply_metadata(paper, metadata, overwrite_title=True)
             db.commit()
         except Exception:
             logger.exception("Background metadata extraction failed for paper %s", paper_id)
