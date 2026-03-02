@@ -7,16 +7,16 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: system-ui, sans-serif; max-width: 800px; margin: 0 auto; padding: 0 1rem; color: #222; }
-    h1 { font-size: 1.6rem; margin-bottom: 1.5rem; }
     .site-banner { position: relative; width: 100vw; left: 50%; transform: translateX(-50%); display: block; line-height: 0; margin-bottom: 2rem; }
     .site-banner img { width: 100%; height: auto; display: block; }
-    .banner-search { position: absolute; top: 50%; left: 430px; transform: translateY(-50%); display: flex; align-items: center; gap: 0.5rem; background: rgba(255,255,255,0.25); backdrop-filter: blur(12px) saturate(180%); -webkit-backdrop-filter: blur(12px) saturate(180%); border: 1px solid rgba(255,255,255,0.5); border-radius: 999px; padding: 0.4rem 0.6rem 0.4rem 1rem; box-shadow: 0 2px 12px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.6); }
-    .banner-search input { background: none; border: none; outline: none; font-size: 0.9rem; color: #222; width: 180px; }
+    .banner-search { position: absolute; top: 50%; left: calc(50% - 400px + 1rem); right: calc(50% - 400px + 1rem); transform: translateY(-50%); display: flex; align-items: center; gap: 0.5rem; background: rgba(255,255,255,0.25); backdrop-filter: blur(12px) saturate(180%); -webkit-backdrop-filter: blur(12px) saturate(180%); border: 1px solid rgba(255,255,255,0.5); border-radius: 999px; padding: 0.4rem 0.6rem 0.4rem 1rem; box-shadow: 0 2px 12px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.6); }
+    .banner-search input { background: none; border: none; outline: none; font-size: 0.9rem; color: #222; flex: 1; min-width: 0; }
     .banner-search input::placeholder { color: rgba(60,60,60,0.6); }
     .banner-search-btn { background: rgba(255,255,255,0.3); border: 1px solid rgba(255,255,255,0.5); border-radius: 999px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); box-shadow: inset 0 1px 0 rgba(255,255,255,0.5); }
     .banner-search-btn:hover { background: rgba(255,255,255,0.5); }
     .banner-search-btn svg { opacity: 0.6; display: block; }
-    .add-toggle { padding: 0.5rem 1rem; background: #2563eb; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 1rem; }
+    .add-toggle { position: fixed; bottom: 2rem; right: 2rem; width: 56px; height: 56px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.6); cursor: pointer; font-size: 1.6rem; line-height: 1; display: flex; align-items: center; justify-content: center; z-index: 100; background: linear-gradient(145deg, #e8e8e8, #c8c8c8); box-shadow: 0 4px 20px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.8), inset 0 -1px 0 rgba(0,0,0,0.08); color: #444; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+    .add-toggle:hover { background: linear-gradient(145deg, #f0f0f0, #d4d4d4); box-shadow: 0 6px 24px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.9), inset 0 -1px 0 rgba(0,0,0,0.08); }
     .add-form { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; }
     .add-form[hidden] { display: none; }
     .add-form input { flex: 1; padding: 0.5rem 0.75rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; }
@@ -54,11 +54,9 @@
     .pagination button { padding: 0.35rem 0.9rem; border: 1px solid #ccc; border-radius: 4px; background: #fff; cursor: pointer; font-size: 0.9rem; }
     .pagination button:disabled { opacity: 0.4; cursor: not-allowed; }
     #page-info { font-size: 0.85rem; color: #555; }
-    .header-actions { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; }
-    #enrich-btn { padding: 0.5rem 1rem; background: #059669; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 1rem; }
-    #enrich-btn:hover { background: #047857; }
-    #enrich-btn.active { background: #b45309; }
-    #enrich-btn.active:hover { background: #92400e; }
+    #enrich-btn { background: none; border: none; padding: 0; font-size: 0.85rem; color: #2563eb; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+    #enrich-btn:hover { color: #1d4ed8; }
+    #enrich-btn.active { color: #b45309; }
     #enrich-status { font-size: 0.85rem; color: #555; }
     #enrich-status.error { color: #dc2626; }
     #enrich-status.running { color: #d97706; }
@@ -74,13 +72,9 @@
       </button>
     </div>
   </div>
-  <h1>PaperStore</h1>
-
-  <div class="header-actions">
-    <button class="add-toggle" id="add-toggle">+ Add Paper</button>
-    <button id="enrich-btn">Find missing metadata</button>
-    <span id="enrich-status"></span>
-  </div>
+  <button class="add-toggle" id="add-toggle" aria-label="Add paper">
+    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+  </button>
   <form class="add-form" id="add-form" hidden>
     <input type="url" id="url-input" placeholder="Paste an arXiv URL or PDF URL…" required />
     <button type="submit" id="add-btn">Add</button>
@@ -89,6 +83,8 @@
 
   <div class="list-controls">
     <div id="paper-count"></div>
+    <button id="enrich-btn">Find missing metadata</button>
+    <span id="enrich-status"></span>
     <label for="sort-select" style="font-size:0.85rem;color:#666;">Sort:</label>
     <select id="sort-select">
       <option value="added_at">Date Added</option>
