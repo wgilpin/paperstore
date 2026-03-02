@@ -40,10 +40,12 @@ class SearchService:
                 order = Paper.added_at.desc()
             base = db.query(Paper).order_by(order)
             if tag:
-                base = (
-                    base.join(paper_tags, Paper.id == paper_tags.c.paper_id)
-                    .join(Tag, Tag.id == paper_tags.c.tag_id)
-                    .filter(Tag.name == tag)
+                base = base.filter(
+                    Paper.id.in_(
+                        db.query(paper_tags.c.paper_id)
+                        .join(Tag, Tag.id == paper_tags.c.tag_id)
+                        .filter(Tag.name == tag)
+                    )
                 )
             total: int = base.count()
             papers = base.offset(offset).limit(PAGE_SIZE).all()
@@ -56,10 +58,12 @@ class SearchService:
             .order_by(func.ts_rank(Paper.search_vector, tsquery).desc())
         )
         if tag:
-            base = (
-                base.join(paper_tags, Paper.id == paper_tags.c.paper_id)
-                .join(Tag, Tag.id == paper_tags.c.tag_id)
-                .filter(Tag.name == tag)
+            base = base.filter(
+                Paper.id.in_(
+                    db.query(paper_tags.c.paper_id)
+                    .join(Tag, Tag.id == paper_tags.c.tag_id)
+                    .filter(Tag.name == tag)
+                )
             )
         total = base.count()
         papers = base.offset(offset).limit(PAGE_SIZE).all()

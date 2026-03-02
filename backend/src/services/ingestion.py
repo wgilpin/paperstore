@@ -56,6 +56,8 @@ class IngestionService:
 
         # Upload to Drive — raises DriveUploadError on failure.
         title = metadata.get("title") or "Untitled"
+        if db.query(Paper).filter(Paper.title == title).first():
+            raise DuplicateError("A paper with this title already exists in your library")
         safe_title = "".join(c if c.isalnum() or c in " -_" else "_" for c in title).strip()
         drive_result = self._drive.upload(
             pdf_bytes,
@@ -100,6 +102,8 @@ class IngestionService:
 
         metadata = self._pdf.extract_metadata(pdf_bytes)
         title = metadata.get("title") or "Untitled"
+        if db.query(Paper).filter(Paper.title == title).first():
+            raise DuplicateError("A paper with this title already exists in your library")
 
         safe_title = "".join(c if c.isalnum() or c in " -_" else "_" for c in title).strip()
         drive_result = self._drive.upload(pdf_bytes, filename=f"{safe_title}.pdf")

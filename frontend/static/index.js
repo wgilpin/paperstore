@@ -277,6 +277,9 @@ function initIndexPage() {
 
     totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
+    const seen = new Set();
+    papers = papers.filter(p => seen.has(p.id) ? false : seen.add(p.id));
+
     if (!papers || papers.length === 0) {
       paperList.innerHTML = '<li class="no-results">No papers found.</li>';
       pagination.hidden = true;
