@@ -1,8 +1,10 @@
 """FastAPI application entry point."""
 
+import io
 import logging
 import os
 import pathlib
+import zipfile
 from collections.abc import Awaitable, Callable
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s", datefmt="%H:%M:%S")
@@ -18,7 +20,7 @@ for _uvicorn_logger in ("uvicorn", "uvicorn.error", "uvicorn.access"):
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
@@ -136,6 +138,25 @@ app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(papers.router, prefix="/papers", tags=["papers"])
 app.include_router(tags.router, prefix="/tags", tags=["tags"])
 app.include_router(batch.router, prefix="/batch", tags=["batch"])
+
+_extension_dir = pathlib.Path(__file__).parent.parent.parent / "extension"
+
+
+@app.get("/extension/download")
+def download_extension() -> StreamingResponse:
+    """Serve the Chrome extension as a zip file."""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for file in _extension_dir.iterdir():
+            if file.is_file():
+                zf.write(file, file.name)
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": "attachment; filename=paperstore-extension.zip"},
+    )
+
 
 # Serve the frontend if it exists (built later in the project).
 _frontend_dir = pathlib.Path(__file__).parent.parent.parent / "frontend"

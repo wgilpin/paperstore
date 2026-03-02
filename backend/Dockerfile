@@ -11,9 +11,10 @@ COPY backend/pyproject.toml backend/uv.lock ./
 # Install production dependencies only (no dev group)
 RUN uv sync --frozen --no-dev
 
-# Copy application source and frontend
+# Copy application source, frontend, and extension
 COPY backend/src/ ./src/
 COPY frontend/ ../frontend/
+COPY extension/ ../extension/
 
 # Expose the API port
 EXPOSE 8000

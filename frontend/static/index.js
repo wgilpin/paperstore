@@ -22,6 +22,7 @@ function initIndexPage() {
   const tagDropdown = document.getElementById('tag-dropdown');
   const bannerSearchBtn = document.getElementById('banner-search-btn');
   const enrichBtn = document.getElementById('enrich-btn');
+  const enrichBtnLabel = document.getElementById('enrich-btn-label');
   const enrichStatus = document.getElementById('enrich-status');
 
   const PAGE_SIZE = 20;
@@ -51,15 +52,15 @@ function initIndexPage() {
 
   function setEnrichUI(running, eligibleCount) {
     if (running) {
-      enrichBtn.textContent = 'Stop metadata search';
+      enrichBtnLabel.textContent = 'Stop metadata search';
       enrichBtn.classList.add('active');
       enrichStatus.textContent = eligibleCount != null ? `${eligibleCount} still to process…` : 'Running…';
-      enrichStatus.className = 'running';
+      enrichStatus.className = 'menu-enrich-status running';
     } else {
-      enrichBtn.textContent = 'Find missing metadata';
+      enrichBtnLabel.textContent = 'Find missing metadata';
       enrichBtn.classList.remove('active');
       enrichStatus.textContent = eligibleCount === 0 ? 'Done — all papers processed.' : '';
-      enrichStatus.className = '';
+      enrichStatus.className = 'menu-enrich-status';
     }
   }
 

@@ -61,12 +61,20 @@
     .pagination button { padding: 0.35rem 0.9rem; border: 1px solid #ccc; border-radius: 4px; background: #fff; cursor: pointer; font-size: 0.9rem; }
     .pagination button:disabled { opacity: 0.4; cursor: not-allowed; }
     #page-info { font-size: 0.85rem; color: #555; }
-    #enrich-btn { background: none; border: none; padding: 0; font-size: 0.85rem; color: #2563eb; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
-    #enrich-btn:hover { color: #1d4ed8; }
-    #enrich-btn.active { color: #b45309; }
     #enrich-status { font-size: 0.85rem; color: #555; }
     #enrich-status.error { color: #dc2626; }
     #enrich-status.running { color: #d97706; }
+    .hamburger-btn { position: absolute; top: 50%; right: 1rem; transform: translateY(-50%); background: rgba(255,255,255,0.25); backdrop-filter: blur(12px) saturate(180%); -webkit-backdrop-filter: blur(12px) saturate(180%); border: 1px solid rgba(255,255,255,0.5); border-radius: 8px; width: 36px; height: 36px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.1); padding: 0; z-index: 50; }
+    .hamburger-btn:hover { background: rgba(255,255,255,0.45); }
+    .hamburger-btn span { display: block; width: 16px; height: 2px; background: #333; border-radius: 2px; }
+    .hamburger-menu { position: fixed; background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.12); min-width: 220px; z-index: 200; overflow: hidden; }
+    .hamburger-menu[hidden] { display: none; }
+    .menu-item { display: flex; align-items: center; gap: 0.65rem; width: 100%; padding: 0.7rem 1rem; background: none; border: none; font-size: 0.88rem; color: #1e293b; cursor: pointer; text-align: left; text-decoration: none; }
+    .menu-item:hover { background: #f8fafc; }
+    .menu-item.active { color: #b45309; }
+    .menu-item svg { flex-shrink: 0; opacity: 0.6; }
+    .menu-divider { height: 1px; background: #e2e8f0; margin: 0.25rem 0; }
+    .menu-enrich-status { font-size: 0.78rem; color: #888; padding: 0 1rem 0.5rem; }
   </style>
 </head>
 <body>
@@ -78,6 +86,21 @@
         <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
       </button>
     </div>
+    <button class="hamburger-btn" id="hamburger-btn" aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+  <div class="hamburger-menu" id="hamburger-menu" hidden>
+    <button class="menu-item" id="enrich-btn">
+      <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M11 8v6M8 11h6"/></svg>
+      <span id="enrich-btn-label">Find missing metadata</span>
+    </button>
+    <div class="menu-enrich-status" id="enrich-status"></div>
+    <div class="menu-divider"></div>
+    <a class="menu-item" href="/extension/download" download>
+      <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download Chrome extension
+    </a>
   </div>
   <button class="add-toggle" id="add-toggle" aria-label="Add paper">
     <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -90,8 +113,6 @@
 
   <div class="list-controls">
     <div id="paper-count"></div>
-    <button id="enrich-btn">Find missing metadata</button>
-    <span id="enrich-status"></span>
     <label for="sort-select" style="font-size:0.85rem;color:#666;">Sort:</label>
     <select id="sort-select">
       <option value="added_at">Date Added</option>
@@ -118,5 +139,20 @@
 
   <script src="/static/utils.js?v=2"></script>
   <script src="/static/index.js?v=2"></script>
+  <script>
+    const hamburgerBtn = document.getElementById('hamburger-btn');
+    const hamburgerMenu = document.getElementById('hamburger-menu');
+    hamburgerBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (hamburgerMenu.hidden) {
+        const rect = hamburgerBtn.getBoundingClientRect();
+        hamburgerMenu.style.top = (rect.bottom + 6) + 'px';
+        hamburgerMenu.style.right = (window.innerWidth - rect.right) + 'px';
+      }
+      hamburgerMenu.hidden = !hamburgerMenu.hidden;
+    });
+    document.addEventListener('click', () => { hamburgerMenu.hidden = true; });
+    hamburgerMenu.addEventListener('click', (e) => e.stopPropagation());
+  </script>
 </body>
 </html>
