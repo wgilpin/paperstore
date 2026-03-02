@@ -20,6 +20,7 @@ function initIndexPage() {
   const tagPillsRow = document.getElementById('tag-pills-row');
   const tagAutocomplete = document.getElementById('tag-autocomplete');
   const tagDropdown = document.getElementById('tag-dropdown');
+  const bannerSearchBtn = document.getElementById('banner-search-btn');
   const enrichBtn = document.getElementById('enrich-btn');
   const enrichStatus = document.getElementById('enrich-status');
 
@@ -220,11 +221,11 @@ function initIndexPage() {
     }
   });
 
-  // Search — reset to page 1 on new query
-  searchInput.addEventListener('input', debounce(() => {
-    currentPage = 1;
-    loadPapers();
-  }, 300));
+  // Search — Enter key or button click triggers search
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { currentPage = 1; loadPapers(); }
+  });
+  bannerSearchBtn.addEventListener('click', () => { currentPage = 1; loadPapers(); });
 
   // Sort — reset to page 1
   sortSelect.addEventListener('change', () => {

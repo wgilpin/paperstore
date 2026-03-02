@@ -6,8 +6,16 @@
   <title>PaperStore</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: system-ui, sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; color: #222; }
+    body { font-family: system-ui, sans-serif; max-width: 800px; margin: 0 auto; padding: 0 1rem; color: #222; }
     h1 { font-size: 1.6rem; margin-bottom: 1.5rem; }
+    .site-banner { position: relative; width: 100vw; left: 50%; transform: translateX(-50%); display: block; line-height: 0; margin-bottom: 2rem; }
+    .site-banner img { width: 100%; height: auto; display: block; }
+    .banner-search { position: absolute; top: 50%; left: 430px; transform: translateY(-50%); display: flex; align-items: center; gap: 0.5rem; background: rgba(255,255,255,0.25); backdrop-filter: blur(12px) saturate(180%); -webkit-backdrop-filter: blur(12px) saturate(180%); border: 1px solid rgba(255,255,255,0.5); border-radius: 999px; padding: 0.4rem 0.6rem 0.4rem 1rem; box-shadow: 0 2px 12px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.6); }
+    .banner-search input { background: none; border: none; outline: none; font-size: 0.9rem; color: #222; width: 180px; }
+    .banner-search input::placeholder { color: rgba(60,60,60,0.6); }
+    .banner-search-btn { background: rgba(255,255,255,0.3); border: 1px solid rgba(255,255,255,0.5); border-radius: 999px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); box-shadow: inset 0 1px 0 rgba(255,255,255,0.5); }
+    .banner-search-btn:hover { background: rgba(255,255,255,0.5); }
+    .banner-search-btn svg { opacity: 0.6; display: block; }
     .add-toggle { padding: 0.5rem 1rem; background: #2563eb; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 1rem; }
     .add-form { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; }
     .add-form[hidden] { display: none; }
@@ -17,7 +25,6 @@
     #add-status { margin-bottom: 1rem; font-size: 0.9rem; min-height: 1.2em; }
     #add-status.error { color: #dc2626; }
     #add-status.success { color: #16a34a; }
-    .search-bar { width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; margin-bottom: 0.75rem; }
     .list-controls { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; }
     #paper-count { font-size: 0.85rem; color: #666; flex: 1; }
     #sort-select { font-size: 0.85rem; padding: 0.25rem 0.5rem; border: 1px solid #ccc; border-radius: 4px; color: #444; }
@@ -58,6 +65,15 @@
   </style>
 </head>
 <body>
+  <div class="site-banner">
+    <img src="/static/banner-teleosis.png" alt="Teleosis.ai" />
+    <div class="banner-search">
+      <input id="search-input" type="search" placeholder="Search" autocomplete="off" />
+      <button class="banner-search-btn" id="banner-search-btn" aria-label="Search">
+        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      </button>
+    </div>
+  </div>
   <h1>PaperStore</h1>
 
   <div class="header-actions">
@@ -70,8 +86,6 @@
     <button type="submit" id="add-btn">Add</button>
   </form>
   <div id="add-status"></div>
-
-  <input type="search" class="search-bar" id="search-input" placeholder="Search title, authors, abstract…" />
 
   <div class="list-controls">
     <div id="paper-count"></div>
