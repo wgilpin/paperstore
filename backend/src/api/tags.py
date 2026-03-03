@@ -75,7 +75,7 @@ def rename_tag(name: str, body: TagRenameRequest, db: Session = Depends(get_sess
         raise HTTPException(status_code=404, detail="Tag not found")
     if new_name == name:
         return
-    if db.query(Tag).filter(Tag.name == new_name).first() is not None:
+    if db.query(Tag).filter(Tag.name.ilike(new_name)).first() is not None:
         raise HTTPException(status_code=409, detail="A tag with that name already exists")
     tag.name = new_name
     db.commit()

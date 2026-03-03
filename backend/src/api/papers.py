@@ -115,7 +115,11 @@ def upload_paper(
     local_path = Path(filename)
     svc = IngestionService()
     try:
-        paper = svc.ingest_local(pdf_bytes=pdf_bytes, local_path=local_path, source_url=source_url, db=db)
+        paper = svc.ingest_local(
+            pdf_bytes=pdf_bytes,
+            local_path=local_path,
+            source_url=source_url,
+            db=db)
     except DuplicateError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except ValueError as exc:
@@ -174,7 +178,7 @@ def _sync_tags(paper: Paper, tag_names: list[str], db: Session) -> None:
         name = name.strip()
         if not name:
             continue
-        tag = db.query(Tag).filter(Tag.name == name).first()
+        tag = db.query(Tag).filter(Tag.name.ilike(name)).first()
         if tag is None:
             tag = Tag(name=name)
             db.add(tag)
