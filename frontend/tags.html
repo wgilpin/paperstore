@@ -28,6 +28,14 @@
     .tag-row:hover .delete-btn { opacity: 1; }
     .delete-btn:hover { color: #dc2626; }
     .tag-row.deleting { opacity: 0.4; pointer-events: none; }
+    .merge-btn { opacity: 0; background: none; border: none; cursor: pointer; color: #94a3b8; padding: 0.2rem; border-radius: 4px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: opacity 0.15s, color 0.15s; }
+    .tag-row:hover .merge-btn { opacity: 1; }
+    .merge-btn:hover { color: #2563eb; }
+    .merge-picker { display: flex; align-items: center; gap: 0.4rem; flex: 1; position: relative; }
+    .merge-picker input { flex: 1; padding: 0.2rem 0.6rem; border: 1px solid #2563eb; border-radius: 4px; font-size: 0.85rem; outline: none; min-width: 0; }
+    .merge-dropdown { position: absolute; top: calc(100% + 2px); left: 0; right: 0; background: #fff; border: 1px solid #ccc; border-radius: 6px; max-height: 180px; overflow-y: auto; z-index: 20; box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
+    .merge-dropdown div { padding: 0.3rem 0.65rem; font-size: 0.82rem; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .merge-dropdown div:hover, .merge-dropdown div.highlighted { background: #eff6ff; }
     #empty-msg { color: #999; font-style: italic; margin-top: 1rem; }
   </style>
 </head>
