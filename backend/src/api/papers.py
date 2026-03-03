@@ -168,6 +168,7 @@ def get_paper(
 
 def _sync_tags(paper: Paper, tag_names: list[str], db: Session) -> None:
     """Replace paper.tags with the given list of tag names, creating new tags as needed."""
+    old_tags = list(paper.tags)
     resolved: list[Tag] = []
     for name in tag_names:
         name = name.strip()
@@ -180,6 +181,10 @@ def _sync_tags(paper: Paper, tag_names: list[str], db: Session) -> None:
             db.flush()
         resolved.append(tag)
     paper.tags = resolved
+    db.flush()
+    for tag in old_tags:
+        if not tag.papers:
+            db.delete(tag)
 
 
 @router.patch("/{paper_id}")
@@ -212,8 +217,13 @@ def delete_paper(
     if paper is None:
         raise HTTPException(status_code=404, detail="Paper not found")
     drive_file_id = paper.drive_file_id
+    tags_to_check = list(paper.tags)
     db.query(Note).filter(Note.paper_id == paper.id).delete()
     db.delete(paper)
+    db.flush()
+    for tag in tags_to_check:
+        if not tag.papers:
+            db.delete(tag)
     db.commit()
     from src.services.drive import DriveService
     DriveService().delete(drive_file_id)
