@@ -10,3 +10,7 @@ class TagWithCount(BaseModel):
 
 class TagMergeRequest(BaseModel):
     into: str
+
+
+class TagRenameRequest(BaseModel):
+    name: str

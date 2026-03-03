@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from src.db import get_session
 from src.models.paper_tag import paper_tags
 from src.models.tag import Tag
-from src.schemas.tag import TagMergeRequest, TagWithCount
+from src.schemas.tag import TagMergeRequest, TagRenameRequest, TagWithCount
 
 router = APIRouter()
 
@@ -62,6 +62,22 @@ def merge_tag(name: str, body: TagMergeRequest, db: Session = Depends(get_sessio
         .values(tag_id=target.id)
     )
     db.delete(source)
+    db.commit()
+
+
+@router.patch("/{name}", status_code=204)
+def rename_tag(name: str, body: TagRenameRequest, db: Session = Depends(get_session)) -> None:
+    new_name = body.name.strip()
+    if not new_name:
+        raise HTTPException(status_code=422, detail="Tag name cannot be empty")
+    tag = db.query(Tag).filter(Tag.name == name).first()
+    if tag is None:
+        raise HTTPException(status_code=404, detail="Tag not found")
+    if new_name == name:
+        return
+    if db.query(Tag).filter(Tag.name == new_name).first() is not None:
+        raise HTTPException(status_code=409, detail="A tag with that name already exists")
+    tag.name = new_name
     db.commit()
 
 

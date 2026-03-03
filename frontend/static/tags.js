@@ -45,6 +45,9 @@ function initTagsPage() {
         <span class="tag-name">${escapeHtml(tag.name)}</span>
         <div class="tag-bar-wrap"><div class="tag-bar" style="width:${pct}%"></div></div>
         <span class="tag-count">${tag.count} paper${tag.count !== 1 ? 's' : ''}</span>
+        <button class="rename-btn" aria-label="Rename tag ${escapeHtml(tag.name)}" title="Rename">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </button>
         <button class="merge-btn" aria-label="Merge tag ${escapeHtml(tag.name)}" title="Merge into…">
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 7H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3"/><polyline points="16 3 12 7 8 3"/></svg>
         </button>
@@ -52,6 +55,7 @@ function initTagsPage() {
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
         </button>
       `;
+      li.querySelector('.rename-btn').addEventListener('click', (e) => { e.stopPropagation(); startRename(tag.name, li); });
       li.querySelector('.merge-btn').addEventListener('click', (e) => { e.stopPropagation(); startMerge(tag.name, li); });
       li.querySelector('.delete-btn').addEventListener('click', () => deleteTag(tag.name, li));
       tagList.appendChild(li);
@@ -71,6 +75,63 @@ function initTagsPage() {
     } catch {
       li.classList.remove('deleting');
     }
+  }
+
+  function startRename(name, li) {
+    const barWrap = li.querySelector('.tag-bar-wrap');
+    const countSpan = li.querySelector('.tag-count');
+    const nameSpan = li.querySelector('.tag-name');
+    barWrap.hidden = true;
+    countSpan.hidden = true;
+    nameSpan.hidden = true;
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = name;
+    input.className = 'merge-picker';
+    input.style.cssText = 'flex:1;padding:0.2rem 0.6rem;border:1px solid #16a34a;border-radius:4px;font-size:0.85rem;outline:none;min-width:0;';
+    nameSpan.after(input);
+
+    function cancel() {
+      input.remove();
+      nameSpan.hidden = false;
+      barWrap.hidden = false;
+      countSpan.hidden = false;
+    }
+
+    async function save() {
+      const newName = input.value.trim();
+      if (!newName || newName === name) { cancel(); return; }
+      input.disabled = true;
+      li.classList.add('deleting');
+      try {
+        const res = await fetch(`${API}/tags/${encodeURIComponent(name)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: newName }),
+        });
+        if (res.ok || res.status === 204) {
+          const tag = tags.find((t) => t.name === name);
+          if (tag) tag.name = newName;
+          render();
+        } else {
+          li.classList.remove('deleting');
+          cancel();
+        }
+      } catch {
+        li.classList.remove('deleting');
+        cancel();
+      }
+    }
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); save(); }
+      else if (e.key === 'Escape') { cancel(); }
+    });
+    input.addEventListener('blur', () => { setTimeout(cancel, 150); });
+
+    input.focus();
+    input.select();
   }
 
   function startMerge(name, li) {
