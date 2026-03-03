@@ -285,7 +285,11 @@ function initIndexPage() {
     papers = papers.filter(p => seen.has(p.id) ? false : seen.add(p.id));
 
     if (!papers || papers.length === 0) {
-      paperList.innerHTML = '<li class="no-results">No papers found.</li>';
+      let msg = 'No papers found';
+      if (query && activeTag) msg += ` for "${query}" with tag "${activeTag}"`;
+      else if (query) msg += ` for "${query}"`;
+      else if (activeTag) msg += ` with tag "${activeTag}"`;
+      paperList.innerHTML = `<li class="no-results">${escapeHtml(msg)}.</li>`;
       pagination.hidden = true;
       return;
     }
