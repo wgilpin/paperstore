@@ -5,7 +5,7 @@
 
 ## Prerequisites
 
-- Docker Desktop running
+- OrbStack (or Docker Desktop) running
 - Python 3.11 installed
 - `uv` installed (`pip install uv` or via [uv installer](https://docs.astral.sh/uv/getting-started/installation/))
 - Google Cloud project with OAuth 2.0 Desktop credentials (`credentials.json`)
@@ -38,6 +38,7 @@ docker compose up -d
 ```
 
 This starts:
+
 - PostgreSQL on `localhost:5432`
 
 Then start the backend:

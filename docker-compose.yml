@@ -22,7 +22,7 @@ services:
       - .env
     volumes:
       # Read-only credentials file from host (must exist before starting)
-      - "/opt/paperstore/credentials.json:/run/secrets/paperstore-credentials.json:ro"
+      - "${GOOGLE_CREDENTIALS_PATH}:/run/secrets/paperstore-credentials.json:ro"
       # Named volume for token so Docker creates it; persists across restarts
       - google_token:/var/lib/paperstore/token
     depends_on:

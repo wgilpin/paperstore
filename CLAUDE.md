@@ -2,8 +2,8 @@
 
 ## Environment
 
-- **OS**: Windows 11, developed in Git Bash
-- **Shell**: Always use Unix shell syntax (forward slashes, `/dev/null`, not `NUL`)
+- **OS**: macOS, developed in zsh
+- **Shell**: Unix shell syntax (forward slashes, `/dev/null`)
 - **File paths**: Use forward slashes in all commands and scripts (e.g., `src/models/foo.py`)
 - **Python version**: 3.11
 - **Python toolchain**: `uv` only — never use `pip`, `pip-tools`, or `poetry` directly
