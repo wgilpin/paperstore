@@ -20,6 +20,7 @@ credentials.json
 token.json
 **/credentials.json
 **/token.json
+credentials/
 
 # Database
 *.db
