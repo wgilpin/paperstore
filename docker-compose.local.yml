@@ -1,9 +1,16 @@
 services:
+  db:
+    ports: !override
+      - "5434:5432"
+
   api:
+    command: ["uv", "run", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     ports:
       - "8000:8000"
+    environment:
+      GOOGLE_REDIRECT_URI: http://localhost:8000/auth/callback
+      GOOGLE_JS_ORIGIN: http://localhost:8000
+      OAUTHLIB_INSECURE_TRANSPORT: "1"
     volumes:
       - ./backend/src:/app/src
       - ./frontend:/frontend
-    environment:
-      OAUTHLIB_INSECURE_TRANSPORT: "1"

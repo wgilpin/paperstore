@@ -91,6 +91,15 @@ class ExtractedMetadata(BaseModel):
     abstract: str | None
 
 
+class RecentPaper(BaseModel):
+    title: str
+    authors: str
+    date: datetime
+    url: str
+    summary: str | None
+    extracted_text: str | None
+
+
 class ErrorResponse(BaseModel):
     error: str
     detail: str | None = None
