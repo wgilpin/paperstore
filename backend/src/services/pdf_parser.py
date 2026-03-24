@@ -61,3 +61,13 @@ class PdfParser:
             abstract=None,
             arxiv_id=None,
         )
+
+    def extract_full_text(self, pdf_bytes: bytes) -> str | None:
+        """Extract all text from a PDF using pdfplumber. Returns None on failure."""
+        try:
+            with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+                return "\n\n".join(
+                    page.extract_text() or "" for page in pdf.pages
+                ).strip() or None
+        except Exception:
+            return None

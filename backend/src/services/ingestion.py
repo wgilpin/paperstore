@@ -72,6 +72,7 @@ class IngestionService:
             submission_url=url,
             drive_file_id=drive_result["file_id"],
             drive_view_url=drive_result["view_url"],
+            extracted_text=self._pdf.extract_full_text(pdf_bytes),
         )
         db.add(paper)
         db.flush()
@@ -117,6 +118,7 @@ class IngestionService:
             submission_url=submission_url,
             drive_file_id=drive_result["file_id"],
             drive_view_url=drive_result["view_url"],
+            extracted_text=self._pdf.extract_full_text(pdf_bytes),
         )
         db.add(paper)
         db.flush()

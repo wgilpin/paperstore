@@ -39,8 +39,8 @@ def get_recent(
             date=p.added_at,
             url=p.submission_url,
             summary=p.abstract or None,
-            extracted_text=None,
+            extracted_text=p.extracted_text,
         )
         for p in papers
-        if p.abstract
+        if p.abstract or p.extracted_text
     ]
