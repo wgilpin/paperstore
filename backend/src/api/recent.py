@@ -36,7 +36,7 @@ def get_recent(
         RecentPaper(
             title=p.title,
             authors=", ".join(p.authors) if p.authors else "Unknown",
-            date=p.added_at,
+            date=p.added_at.replace(tzinfo=UTC) if p.added_at.tzinfo is None else p.added_at,
             url=p.submission_url,
             summary=p.abstract or None,
             extracted_text=p.extracted_text,
