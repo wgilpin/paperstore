@@ -4,6 +4,7 @@ import os
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from src.db import get_session
@@ -25,13 +26,18 @@ def _verify_token(authorization: str | None = Header(default=None)) -> None:
 @router.get("/recent", dependencies=[Depends(_verify_token)])
 def get_recent(
     since: datetime | None = Query(default=None),
+    limit: int = Query(default=5, ge=1),
     db: Session = Depends(get_session),
 ) -> list[RecentPaper]:
-    query = db.query(Paper).order_by(Paper.added_at.desc())
+    query = (
+        db.query(Paper)
+        .filter(or_(Paper.abstract.isnot(None), Paper.extracted_text.isnot(None)))
+        .order_by(Paper.added_at.desc())
+        .limit(limit)
+    )
     if since is not None:
         since_utc = since.replace(tzinfo=UTC) if since.tzinfo is None else since
         query = query.filter(Paper.added_at > since_utc)
-    papers = query.all()
     return [
         RecentPaper(
             title=p.title,
@@ -41,6 +47,5 @@ def get_recent(
             summary=p.abstract or None,
             extracted_text=p.extracted_text,
         )
-        for p in papers
-        if p.abstract or p.extracted_text
+        for p in query.all()
     ]
