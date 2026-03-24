@@ -11,11 +11,18 @@ def _mock_paper(title: str = "Paper") -> MagicMock:
     return p
 
 
-def _make_db_returning(papers: list[MagicMock]) -> MagicMock:
-    """Mock db whose query chain returns *papers* from .all()."""
+def _make_db_returning(papers: list[MagicMock], total: int | None = None) -> MagicMock:
+    """Mock db whose query chain returns *papers* and *total* from paginated calls."""
+    count = total if total is not None else len(papers)
     db = MagicMock()
-    db.query.return_value.order_by.return_value.all.return_value = papers
-    db.query.return_value.filter.return_value.order_by.return_value.all.return_value = papers
+    # No-filter path: order_by().count() and order_by().offset().limit().all()
+    no_filter = db.query.return_value.order_by.return_value
+    no_filter.count.return_value = count
+    no_filter.offset.return_value.limit.return_value.all.return_value = papers
+    # Filter path: filter().order_by().count() and filter().order_by().offset().limit().all()
+    with_filter = db.query.return_value.filter.return_value.order_by.return_value
+    with_filter.count.return_value = count
+    with_filter.offset.return_value.limit.return_value.all.return_value = papers
     return db
 
 
@@ -24,9 +31,10 @@ class TestSearchServiceSearch:
         papers = [_mock_paper("A"), _mock_paper("B")]
         db = _make_db_returning(papers)
 
-        result = SearchService().search(None, db)
+        result_papers, total = SearchService().search(None, db)
 
-        assert result == papers
+        assert result_papers == papers
+        assert total == len(papers)
         # Should NOT call filter (no tsquery)
         db.query.return_value.filter.assert_not_called()
 
@@ -34,23 +42,26 @@ class TestSearchServiceSearch:
         papers = [_mock_paper()]
         db = _make_db_returning(papers)
 
-        result = SearchService().search("", db)
+        result_papers, total = SearchService().search("", db)
 
-        assert result == papers
+        assert result_papers == papers
+        assert total == len(papers)
         db.query.return_value.filter.assert_not_called()
 
     def test_applies_tsquery_filter_for_non_empty_query(self) -> None:
         papers = [_mock_paper("Transformer paper")]
         db = _make_db_returning(papers)
 
-        result = SearchService().search("transformer", db)
+        result_papers, total = SearchService().search("transformer", db)
 
-        assert result == papers
+        assert result_papers == papers
+        assert total == len(papers)
         db.query.return_value.filter.assert_called_once()
 
     def test_returns_empty_list_when_no_match(self) -> None:
         db = _make_db_returning([])
 
-        result = SearchService().search("zzznomatch", db)
+        result_papers, total = SearchService().search("zzznomatch", db)
 
-        assert result == []
+        assert result_papers == []
+        assert total == 0

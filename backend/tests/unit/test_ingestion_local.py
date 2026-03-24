@@ -60,7 +60,7 @@ class TestIngestionServiceIngestLocal:
 
         db = _make_db()
         svc = _make_service(mock_pdf, mock_drive)
-        svc.ingest_local(_PDF_BYTES, Path("C:/tmp/paper.pdf"), db)
+        svc.ingest_local(_PDF_BYTES, Path("/tmp/paper.pdf"), db)
 
         mock_pdf.extract_metadata.assert_called_once_with(_PDF_BYTES)
         mock_drive.upload.assert_called_once()
@@ -76,7 +76,7 @@ class TestIngestionServiceIngestLocal:
         svc = _make_service(mock_pdf, mock_drive)
 
         with pytest.raises(DuplicateError):
-            svc.ingest_local(_PDF_BYTES, Path("C:/tmp/paper.pdf"), db)
+            svc.ingest_local(_PDF_BYTES, Path("/tmp/paper.pdf"), db)
 
     def test_does_not_commit_on_drive_failure(self) -> None:
         mock_pdf = MagicMock()
@@ -88,6 +88,6 @@ class TestIngestionServiceIngestLocal:
         svc = _make_service(mock_pdf, mock_drive)
 
         with pytest.raises(DriveUploadError):
-            svc.ingest_local(_PDF_BYTES, Path("C:/tmp/paper.pdf"), db)
+            svc.ingest_local(_PDF_BYTES, Path("/tmp/paper.pdf"), db)
 
         db.commit.assert_not_called()

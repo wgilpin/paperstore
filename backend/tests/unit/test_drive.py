@@ -10,7 +10,7 @@ from src.services.drive import DriveService, DriveUploadError
 class TestDriveServiceUpload:
     def _make_service(self) -> tuple[DriveService, MagicMock]:
         mock_drive = MagicMock()
-        with patch("src.services.drive.DriveService._build_service", return_value=mock_drive):
+        with patch("src.services.drive.DriveService._get_service", return_value=mock_drive):
             svc = DriveService()
         svc._service = mock_drive
         return svc, mock_drive
