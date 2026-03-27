@@ -41,7 +41,7 @@ function filenameFromUrl(url) {
 }
 
 async function submitArxiv(tabUrl) {
-  const resp = await fetch(`${BACKEND}/api/papers`, {
+  const resp = await fetch(`${BACKEND}/papers`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ url: normalizeArxivUrl(tabUrl) }),
@@ -63,7 +63,7 @@ async function submitPdf(tabUrl) {
   form.append("file", blob, filenameFromUrl(tabUrl));
   form.append("source_url", tabUrl);
 
-  const resp = await fetch(`${BACKEND}/api/papers/upload`, {
+  const resp = await fetch(`${BACKEND}/papers/upload`, {
     method: "POST",
     body: form,
     credentials: "include",
