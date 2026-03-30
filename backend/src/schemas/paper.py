@@ -100,6 +100,18 @@ class RecentPaper(BaseModel):
     extracted_text: str | None
 
 
+class SearchPaper(BaseModel):
+    id: uuid.UUID
+    title: str
+    authors: list[str]
+    added_at: datetime
+    published_date: date | None
+    url: str
+    tags: list[str]
+    summary: str | None
+    extracted_text: str | None
+
+
 class ErrorResponse(BaseModel):
     error: str
     detail: str | None = None

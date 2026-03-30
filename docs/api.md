@@ -254,17 +254,22 @@ Stop the background metadata extraction loop.
 
 ---
 
-## Recent Papers (External)
+## External API
+
+All endpoints in this section use Bearer token auth: `Authorization: Bearer <RECENT_API_TOKEN>`
+
+**Errors** — `401` missing/invalid token, `500` token not configured
+
+---
 
 ### `GET /api/recent`
 
 Recently saved papers for external consumers (e.g. news aggregator).
 
-**Auth** — `Authorization: Bearer <RECENT_API_TOKEN>`
-
-| Param | Type | Description |
-|-------|------|-------------|
-| `since` | datetime | Only return papers added after this time |
+| Param   | Type     | Default | Description                              |
+|---------|----------|---------|------------------------------------------|
+| `since` | datetime | —       | Only return papers added after this time |
+| `limit` | int      | `5`     | Max number of papers to return           |
 
 **Response `200`**
 
@@ -281,7 +286,38 @@ Recently saved papers for external consumers (e.g. news aggregator).
 ]
 ```
 
-**Errors** — `401` missing/invalid token
+---
+
+### `GET /api/search`
+
+Full-text search across papers. Results ranked by relevance.
+
+| Param   | Type     | Default      | Description                                       |
+|---------|----------|--------------|---------------------------------------------------|
+| `q`     | string   | **required** | Full-text search query (title, abstract, authors) |
+| `limit` | int      | `20`         | Max number of results to return                   |
+| `tag`   | string   | —            | Filter by tag name                                |
+| `since` | datetime | —            | Only return papers added after this time          |
+
+**Response `200`**
+
+```json
+[
+  {
+    "id": "uuid",
+    "title": "string",
+    "authors": ["string"],
+    "added_at": "datetime",
+    "published_date": "date | null",
+    "url": "string",
+    "tags": ["string"],
+    "summary": "string | null",
+    "extracted_text": "string | null"
+  }
+]
+```
+
+**Errors** — `422` missing `q`
 
 ---
 
