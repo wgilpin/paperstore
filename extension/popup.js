@@ -2,6 +2,16 @@ const BACKEND = "https://papers.teleosis.ai";
 
 const statusEl = document.getElementById("status");
 const addBtn   = document.getElementById("addBtn");
+const viewBtn  = document.getElementById("viewBtn");
+const openBtn  = document.getElementById("openBtn");
+
+openBtn.addEventListener("click", () => {
+  chrome.tabs.create({ url: BACKEND });
+});
+
+viewBtn.addEventListener("click", () => {
+  chrome.tabs.create({ url: BACKEND });
+});
 
 function setStatus(cls, text) {
   statusEl.className = cls;
@@ -86,6 +96,7 @@ async function submitPdf(tabUrl) {
       try {
         const result = await submitArxiv(url);
         setStatus(result, result === "success" ? "Paper added to your library!" : "Already in your library.");
+        if (result === "success" || result === "duplicate") viewBtn.style.display = "";
       } catch (err) {
         setStatus("error", `Error: ${err.message}`);
         addBtn.disabled = false;
@@ -99,6 +110,7 @@ async function submitPdf(tabUrl) {
       try {
         const result = await submitPdf(url);
         setStatus(result, result === "success" ? "PDF added! Extracting metadata\u2026" : "Already in your library.");
+        if (result === "success" || result === "duplicate") viewBtn.style.display = "";
       } catch (err) {
         setStatus("error", `Error: ${err.message}`);
         addBtn.disabled = false;
