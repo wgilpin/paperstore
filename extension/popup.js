@@ -57,6 +57,7 @@ async function submitArxiv(tabUrl) {
     body: JSON.stringify({ url: normalizeArxivUrl(tabUrl) }),
     credentials: "include",
   });
+  if (resp.url.includes("/auth/login")) throw new Error("Not logged in — open Paperstore and sign in first.");
   if (resp.status === 409) return "duplicate";
   if (!resp.ok) throw new Error(`Server error ${resp.status}`);
   return "success";
@@ -78,6 +79,7 @@ async function submitPdf(tabUrl) {
     body: form,
     credentials: "include",
   });
+  if (resp.url.includes("/auth/login")) throw new Error("Not logged in — open Paperstore and sign in first.");
   if (resp.status === 409) return "duplicate";
   if (!resp.ok) throw new Error(`Server error ${resp.status}`);
   return "success";
