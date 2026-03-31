@@ -2,6 +2,16 @@ const BACKEND = "https://papers.teleosis.ai";
 
 const statusEl = document.getElementById("status");
 const addBtn   = document.getElementById("addBtn");
+const viewBtn  = document.getElementById("viewBtn");
+const openBtn  = document.getElementById("openBtn");
+
+openBtn.addEventListener("click", () => {
+  chrome.tabs.create({ url: BACKEND });
+});
+
+viewBtn.addEventListener("click", () => {
+  chrome.tabs.create({ url: BACKEND });
+});
 
 function setStatus(cls, text) {
   statusEl.className = cls;
@@ -41,12 +51,13 @@ function filenameFromUrl(url) {
 }
 
 async function submitArxiv(tabUrl) {
-  const resp = await fetch(`${BACKEND}/api/papers`, {
+  const resp = await fetch(`${BACKEND}/papers`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ url: normalizeArxivUrl(tabUrl) }),
     credentials: "include",
   });
+  if (resp.url.includes("/auth/login")) throw new Error("Not logged in — open Paperstore and sign in first.");
   if (resp.status === 409) return "duplicate";
   if (!resp.ok) throw new Error(`Server error ${resp.status}`);
   return "success";
@@ -63,11 +74,12 @@ async function submitPdf(tabUrl) {
   form.append("file", blob, filenameFromUrl(tabUrl));
   form.append("source_url", tabUrl);
 
-  const resp = await fetch(`${BACKEND}/api/papers/upload`, {
+  const resp = await fetch(`${BACKEND}/papers/upload`, {
     method: "POST",
     body: form,
     credentials: "include",
   });
+  if (resp.url.includes("/auth/login")) throw new Error("Not logged in — open Paperstore and sign in first.");
   if (resp.status === 409) return "duplicate";
   if (!resp.ok) throw new Error(`Server error ${resp.status}`);
   return "success";
@@ -86,6 +98,7 @@ async function submitPdf(tabUrl) {
       try {
         const result = await submitArxiv(url);
         setStatus(result, result === "success" ? "Paper added to your library!" : "Already in your library.");
+        if (result === "success" || result === "duplicate") viewBtn.style.display = "";
       } catch (err) {
         setStatus("error", `Error: ${err.message}`);
         addBtn.disabled = false;
@@ -99,6 +112,7 @@ async function submitPdf(tabUrl) {
       try {
         const result = await submitPdf(url);
         setStatus(result, result === "success" ? "PDF added! Extracting metadata\u2026" : "Already in your library.");
+        if (result === "success" || result === "duplicate") viewBtn.style.display = "";
       } catch (err) {
         setStatus("error", `Error: ${err.message}`);
         addBtn.disabled = false;

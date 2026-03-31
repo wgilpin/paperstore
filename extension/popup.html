@@ -40,12 +40,21 @@
       cursor: pointer;
     }
     button:disabled { background: #93c5fd; cursor: default; }
+    button.secondary {
+      background: #f3f4f6;
+      color: #1a1a1a;
+      border: 1px solid #d1d5db;
+    }
+    button.secondary:hover { background: #e5e7eb; }
+    #viewBtn { display: none; }
   </style>
 </head>
 <body>
   <h1>PaperStore</h1>
   <div id="status">Checking current page…</div>
   <button id="addBtn" disabled>Add Paper</button>
+  <button id="viewBtn" class="secondary">View in Paperstore</button>
+  <button id="openBtn" class="secondary">Open Paperstore</button>
   <script src="popup.js"></script>
 </body>
 </html>

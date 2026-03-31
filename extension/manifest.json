@@ -9,7 +9,8 @@
     "https://arxiv.org/*",
     "https://*.arxiv.org/*",
     "https://alphaxiv.org/*",
-    "https://*.alphaxiv.org/*"
+    "https://*.alphaxiv.org/*",
+    "<all_urls>"
   ],
   "action": {
     "default_popup": "popup.html",
