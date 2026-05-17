@@ -24,6 +24,7 @@ from src.schemas.paper import (
     PaperUpdateRequest,
 )
 from src.services.batch_metadata import _apply_metadata, _is_eligible
+from src.services.arxiv_client import ArxivUnavailableError
 from src.services.drive import DriveUploadError
 from src.services.gemini import GeminiService
 from src.services.ingestion import DuplicateError, IngestionService
@@ -92,6 +93,8 @@ def submit_paper(
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except DriveUploadError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except ArxivUnavailableError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     if _is_eligible(paper):

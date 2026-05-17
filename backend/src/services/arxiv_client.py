@@ -6,6 +6,10 @@ import arxiv
 
 from src.services.types import PaperMetadata
 
+# arXiv's edge (Fastly) rate-limits the arxiv library's default UA aggressively.
+# A descriptive UA with contact info is accepted. See arXiv API Terms of Use.
+_USER_AGENT = "PaperStoreApp/1.0 (+https://github.com/wgilpin/paperstore; contact: wgilpin@gmail.com)"
+
 # Matches new-style IDs like 2301.00001 (with optional version suffix).
 _NEW_ID_RE = re.compile(r"(\d{4}\.\d{4,5})(?:v\d+)?")
 # Matches legacy IDs like hep-th/9901001.
@@ -24,6 +28,10 @@ def extract_arxiv_id(url_or_id: str) -> str:
     raise ValueError(f"Cannot extract arXiv ID from: {url_or_id!r}")
 
 
+class ArxivUnavailableError(RuntimeError):
+    """Raised when the arXiv API is unreachable or rate-limiting us."""
+
+
 class ArxivClient:
     """Thin wrapper around the arxiv package."""
 
@@ -35,7 +43,13 @@ class ArxivClient:
         arxiv_id = extract_arxiv_id(arxiv_id_or_url)
         search = arxiv.Search(id_list=[arxiv_id])
         client = arxiv.Client()
-        results = list(client.results(search))
+        client._session.headers.update({"User-Agent": _USER_AGENT})
+        try:
+            results = list(client.results(search))
+        except arxiv.HTTPError as exc:
+            raise ArxivUnavailableError(
+                f"arXiv API request failed (HTTP {exc.status}): {arxiv_id}"
+            ) from exc
         if not results:
             raise ValueError(f"arXiv paper not found: {arxiv_id!r}")
         result = results[0]
