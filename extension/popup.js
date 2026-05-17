@@ -69,7 +69,7 @@ async function submitPdf(tabUrl) {
   if (!pdfResp.ok) throw new Error(`Could not fetch PDF (${pdfResp.status})`);
   const blob = await pdfResp.blob();
 
-  setStatus("submitting", "Uploading to PaperStore\u2026");
+  setStatus("submitting", "Uploading to PaperStore\u2026 This may take a minute, please wait.");
   const form = new FormData();
   form.append("file", blob, filenameFromUrl(tabUrl));
   form.append("source_url", tabUrl);
@@ -94,7 +94,7 @@ async function submitPdf(tabUrl) {
     addBtn.disabled = false;
     addBtn.addEventListener("click", async () => {
       addBtn.disabled = true;
-      setStatus("submitting", "Submitting to PaperStore\u2026");
+      setStatus("submitting", "Submitting to PaperStore\u2026 This may take a minute, please wait.");
       try {
         const result = await submitArxiv(url);
         setStatus(result, result === "success" ? "Paper added to your library!" : "Already in your library.");
