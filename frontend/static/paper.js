@@ -44,7 +44,10 @@ function initPaperPage() {
     document.title = `${paper.title} — PaperStore`;
     document.getElementById('paper-title').textContent = paper.title;
     document.getElementById('paper-authors').textContent = formatAuthors(paper.authors);
-    document.getElementById('paper-date').textContent = paper.published_date ? formatDate(paper.published_date) : '';
+    const dateParts = [];
+    if (paper.published_date) dateParts.push(`Pub: ${formatDate(paper.published_date)}`);
+    if (paper.added_at) dateParts.push(`Added: ${formatDate(paper.added_at)}`);
+    document.getElementById('paper-date').textContent = dateParts.join(' · ');
     document.getElementById('paper-abstract').textContent = paper.abstract || '';
     const embedUrl = paper.drive_view_url.replace(/\/view(\?.*)?$/, '/preview');
     document.getElementById('pdf-frame').src = embedUrl;

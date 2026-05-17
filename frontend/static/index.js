@@ -301,7 +301,7 @@ function initIndexPage() {
       return `
         <li class="paper-item" data-id="${p.id}">
           <div class="paper-title">${escapeHtml(p.title)}</div>
-          <div class="paper-meta">${escapeHtml(formatAuthors(p.authors))}${p.published_date ? ' · ' + formatDate(p.published_date) : ''}</div>
+          <div class="paper-meta">${escapeHtml(formatAuthors(p.authors))}${p.published_date ? ' · Pub: ' + formatDate(p.published_date) : ''}${p.added_at ? ' · Added: ' + formatDate(p.added_at) : ''}</div>
           ${tagsHtml}
         </li>
       `;
