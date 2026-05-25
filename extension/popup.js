@@ -4,6 +4,8 @@ const statusEl = document.getElementById("status");
 const addBtn   = document.getElementById("addBtn");
 const viewBtn  = document.getElementById("viewBtn");
 const openBtn  = document.getElementById("openBtn");
+const viewLink = document.getElementById("viewLink");
+const viewLinkA = viewLink.querySelector("a");
 
 openBtn.addEventListener("click", () => {
   chrome.tabs.create({ url: BACKEND });
@@ -11,6 +13,13 @@ openBtn.addEventListener("click", () => {
 
 viewBtn.addEventListener("click", () => {
   chrome.tabs.create({ url: BACKEND });
+});
+
+viewLinkA.addEventListener("click", (e) => {
+  e.preventDefault();
+  if (viewLinkA.href && viewLinkA.href !== "#" && !viewLinkA.href.startsWith("javascript:")) {
+    chrome.tabs.create({ url: viewLinkA.href });
+  }
 });
 
 function setStatus(cls, text) {
@@ -58,9 +67,22 @@ async function submitArxiv(tabUrl) {
     credentials: "include",
   });
   if (resp.url.includes("/auth/login")) throw new Error("Not logged in — open Paperstore and sign in first.");
-  if (resp.status === 409) return "duplicate";
+  if (resp.status === 409) {
+    try {
+      const data = await resp.json();
+      const paperId = typeof data.detail === "object" ? data.detail.paper_id : (data.paper_id || null);
+      return { status: "duplicate", paperId };
+    } catch {
+      return { status: "duplicate", paperId: null };
+    }
+  }
   if (!resp.ok) throw new Error(`Server error ${resp.status}`);
-  return "success";
+  try {
+    const data = await resp.json();
+    return { status: "success", paperId: data.paper?.id || null };
+  } catch {
+    return { status: "success", paperId: null };
+  }
 }
 
 async function submitPdf(tabUrl) {
@@ -80,9 +102,22 @@ async function submitPdf(tabUrl) {
     credentials: "include",
   });
   if (resp.url.includes("/auth/login")) throw new Error("Not logged in — open Paperstore and sign in first.");
-  if (resp.status === 409) return "duplicate";
+  if (resp.status === 409) {
+    try {
+      const data = await resp.json();
+      const paperId = typeof data.detail === "object" ? data.detail.paper_id : (data.paper_id || null);
+      return { status: "duplicate", paperId };
+    } catch {
+      return { status: "duplicate", paperId: null };
+    }
+  }
   if (!resp.ok) throw new Error(`Server error ${resp.status}`);
-  return "success";
+  try {
+    const data = await resp.json();
+    return { status: "success", paperId: data.paper?.id || null };
+  } catch {
+    return { status: "success", paperId: null };
+  }
 }
 
 (async () => {
@@ -101,8 +136,15 @@ async function submitPdf(tabUrl) {
       setStatus("submitting", "Submitting to PaperStore\u2026 This may take a minute, please wait.");
       try {
         const result = await submitArxiv(url);
-        setStatus(result, result === "success" ? "Paper added to your library!" : "Already in your library.");
-        if (result === "success" || result === "duplicate") {
+        const status = result.status;
+        const paperId = result.paperId;
+
+        setStatus(status, status === "success" ? "Paper added to your library!" : "Already in your library.");
+        if (status === "success" || status === "duplicate") {
+          if (paperId) {
+            viewLinkA.href = `${BACKEND}/paper.html?id=${paperId}`;
+            viewLink.style.display = "block";
+          }
           viewBtn.style.display = "";
           addBtn.textContent = "Close";
           addBtn.disabled = false;
@@ -125,8 +167,15 @@ async function submitPdf(tabUrl) {
       addBtn.disabled = true;
       try {
         const result = await submitPdf(url);
-        setStatus(result, result === "success" ? "PDF added!" : "Already in your library.");
-        if (result === "success" || result === "duplicate") {
+        const status = result.status;
+        const paperId = result.paperId;
+
+        setStatus(status, status === "success" ? "PDF added!" : "Already in your library.");
+        if (status === "success" || status === "duplicate") {
+          if (paperId) {
+            viewLinkA.href = `${BACKEND}/paper.html?id=${paperId}`;
+            viewLink.style.display = "block";
+          }
           viewBtn.style.display = "";
           addBtn.textContent = "Close";
           addBtn.disabled = false;

@@ -89,7 +89,14 @@ def submit_paper(
     try:
         paper = svc.ingest(body.url, db)
     except DuplicateError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "duplicate",
+                "message": str(exc),
+                "paper_id": exc.paper_id
+            }
+        ) from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except DriveUploadError as exc:
@@ -124,7 +131,14 @@ def upload_paper(
             source_url=source_url,
             db=db)
     except DuplicateError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "duplicate",
+                "message": str(exc),
+                "paper_id": exc.paper_id
+            }
+        ) from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except DriveUploadError as exc:

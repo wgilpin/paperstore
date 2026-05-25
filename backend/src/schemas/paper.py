@@ -115,3 +115,4 @@ class SearchPaper(BaseModel):
 class ErrorResponse(BaseModel):
     error: str
     detail: str | None = None
+    paper_id: str | None = None

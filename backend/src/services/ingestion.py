@@ -16,6 +16,9 @@ _ARXIV_HOSTNAMES = {"arxiv.org", "ar5iv.labs.arxiv.org"}
 
 class DuplicateError(Exception):
     """Raised when the submitted paper already exists in the library."""
+    def __init__(self, message: str, paper_id: str | None = None) -> None:
+        super().__init__(message)
+        self.paper_id = paper_id
 
 
 def _is_arxiv_url(url: str) -> bool:
@@ -40,14 +43,16 @@ class IngestionService:
         Raises DriveUploadError if the Drive upload fails (no partial record created).
         """
         # Duplicate check by submission URL.
-        if db.query(Paper).filter(Paper.submission_url == url).first():
-            raise DuplicateError("Paper already exists in your library")
+        existing = db.query(Paper).filter(Paper.submission_url == url).first()
+        if existing:
+            raise DuplicateError("Paper already exists in your library", paper_id=str(existing.id))
 
         if _is_arxiv_url(url):
             arxiv_id = extract_arxiv_id(url)
             # Duplicate check by arXiv ID (covers different URL forms of the same paper).
-            if db.query(Paper).filter(Paper.arxiv_id == arxiv_id).first():
-                raise DuplicateError("Paper already exists in your library")
+            existing = db.query(Paper).filter(Paper.arxiv_id == arxiv_id).first()
+            if existing:
+                raise DuplicateError("Paper already exists in your library", paper_id=str(existing.id))
             metadata = self._arxiv.fetch(url)
             pdf_url = f"https://arxiv.org/pdf/{arxiv_id}"
             _, pdf_bytes = self._pdf.download_and_extract(pdf_url)
@@ -56,8 +61,9 @@ class IngestionService:
 
         # Upload to Drive — raises DriveUploadError on failure.
         title = metadata.get("title") or "Untitled"
-        if db.query(Paper).filter(Paper.title == title).first():
-            raise DuplicateError("A paper with this title already exists in your library")
+        existing = db.query(Paper).filter(Paper.title == title).first()
+        if existing:
+            raise DuplicateError("A paper with this title already exists in your library", paper_id=str(existing.id))
         safe_title = "".join(c if c.isalnum() or c in " -_" else "_" for c in title).strip()
         drive_result = self._drive.upload(
             pdf_bytes,
@@ -98,13 +104,15 @@ class IngestionService:
         """
         submission_url = source_url if source_url else local_path.as_uri()
 
-        if db.query(Paper).filter(Paper.submission_url == submission_url).first():
-            raise DuplicateError("Paper already exists in your library")
+        existing = db.query(Paper).filter(Paper.submission_url == submission_url).first()
+        if existing:
+            raise DuplicateError("Paper already exists in your library", paper_id=str(existing.id))
 
         metadata = self._pdf.extract_metadata(pdf_bytes)
         title = metadata.get("title") or "Untitled"
-        if db.query(Paper).filter(Paper.title == title).first():
-            raise DuplicateError("A paper with this title already exists in your library")
+        existing = db.query(Paper).filter(Paper.title == title).first()
+        if existing:
+            raise DuplicateError("A paper with this title already exists in your library", paper_id=str(existing.id))
 
         safe_title = "".join(c if c.isalnum() or c in " -_" else "_" for c in title).strip()
         drive_result = self._drive.upload(pdf_bytes, filename=f"{safe_title}.pdf")

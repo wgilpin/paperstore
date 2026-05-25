@@ -113,7 +113,7 @@ async def _global_exception_handler(request: Request, exc: Exception) -> JSONRes
     if isinstance(exc, DuplicateError):
         return JSONResponse(
             status_code=409,
-            content=ErrorResponse(error="duplicate", detail=str(exc)).model_dump(),
+            content=ErrorResponse(error="duplicate", detail=str(exc), paper_id=exc.paper_id).model_dump(),
         )
     if isinstance(exc, NotFoundError):
         return JSONResponse(
