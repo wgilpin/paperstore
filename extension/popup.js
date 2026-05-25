@@ -93,12 +93,22 @@ async function submitPdf(tabUrl) {
     setStatus("", "Ready to add this arXiv paper.");
     addBtn.disabled = false;
     addBtn.addEventListener("click", async () => {
+      if (addBtn.textContent === "Close") {
+        window.close();
+        return;
+      }
       addBtn.disabled = true;
       setStatus("submitting", "Submitting to PaperStore\u2026 This may take a minute, please wait.");
       try {
         const result = await submitArxiv(url);
         setStatus(result, result === "success" ? "Paper added to your library!" : "Already in your library.");
-        if (result === "success" || result === "duplicate") viewBtn.style.display = "";
+        if (result === "success" || result === "duplicate") {
+          viewBtn.style.display = "";
+          addBtn.textContent = "Close";
+          addBtn.disabled = false;
+        } else {
+          addBtn.disabled = false;
+        }
       } catch (err) {
         setStatus("error", `Error: ${err.message}`);
         addBtn.disabled = false;
@@ -108,11 +118,21 @@ async function submitPdf(tabUrl) {
     setStatus("", "Ready to upload this PDF.");
     addBtn.disabled = false;
     addBtn.addEventListener("click", async () => {
+      if (addBtn.textContent === "Close") {
+        window.close();
+        return;
+      }
       addBtn.disabled = true;
       try {
         const result = await submitPdf(url);
-        setStatus(result, result === "success" ? "PDF added! Extracting metadata\u2026" : "Already in your library.");
-        if (result === "success" || result === "duplicate") viewBtn.style.display = "";
+        setStatus(result, result === "success" ? "PDF added!" : "Already in your library.");
+        if (result === "success" || result === "duplicate") {
+          viewBtn.style.display = "";
+          addBtn.textContent = "Close";
+          addBtn.disabled = false;
+        } else {
+          addBtn.disabled = false;
+        }
       } catch (err) {
         setStatus("error", `Error: ${err.message}`);
         addBtn.disabled = false;
