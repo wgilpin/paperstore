@@ -124,6 +124,39 @@ async function submitPdf(tabUrl) {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   const url = tab.url || "";
 
+  // Check if paper is already saved in Paperstore
+  let isSaved = false;
+  let savedPaperId = null;
+  if (isArxivHost(url) || isPdfUrl(url)) {
+    try {
+      const checkResp = await fetch(`${BACKEND}/papers/check?url=${encodeURIComponent(url)}`, { credentials: "include" });
+      if (checkResp.ok) {
+        const checkData = await checkResp.json();
+        if (checkData.saved) {
+          isSaved = true;
+          savedPaperId = checkData.paper_id;
+        }
+      }
+    } catch (e) {
+      console.error("Failed to check duplicate paper:", e);
+    }
+  }
+
+  if (isSaved) {
+    setStatus("duplicate", "Paper already saved.");
+    if (savedPaperId) {
+      viewLinkA.href = `${BACKEND}/paper.html?id=${savedPaperId}`;
+      viewLink.style.display = "block";
+    }
+    viewBtn.style.display = "";
+    addBtn.textContent = "Close";
+    addBtn.disabled = false;
+    addBtn.addEventListener("click", () => {
+      window.close();
+    });
+    return;
+  }
+
   if (isArxivHost(url)) {
     setStatus("", "Ready to add this arXiv paper.");
     addBtn.disabled = false;
@@ -139,7 +172,7 @@ async function submitPdf(tabUrl) {
         const status = result.status;
         const paperId = result.paperId;
 
-        setStatus(status, status === "success" ? "Paper added to your library!" : "Already in your library.");
+        setStatus(status, status === "success" ? "Paper added to your library!" : "Paper already saved.");
         if (status === "success" || status === "duplicate") {
           if (paperId) {
             viewLinkA.href = `${BACKEND}/paper.html?id=${paperId}`;
@@ -170,7 +203,7 @@ async function submitPdf(tabUrl) {
         const status = result.status;
         const paperId = result.paperId;
 
-        setStatus(status, status === "success" ? "PDF added!" : "Already in your library.");
+        setStatus(status, status === "success" ? "PDF added!" : "Paper already saved.");
         if (status === "success" || status === "duplicate") {
           if (paperId) {
             viewLinkA.href = `${BACKEND}/paper.html?id=${paperId}`;

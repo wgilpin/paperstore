@@ -174,6 +174,30 @@ def list_papers(
     return {"papers": summaries, "total": total}
 
 
+@router.get("/check")
+def check_paper(
+    url: str = Query(...),
+    db: Session = Depends(get_session),
+) -> dict[str, object]:
+    """Check if a paper is already saved by submission URL or arXiv ID."""
+    from src.services.arxiv_client import extract_arxiv_id
+    from src.services.ingestion import _is_arxiv_url
+
+    # Check by submission URL
+    paper = db.query(Paper).filter(Paper.submission_url == url).first()
+    if paper:
+        return {"saved": True, "paper_id": str(paper.id)}
+
+    # Check by arXiv ID if applicable
+    if _is_arxiv_url(url):
+        arxiv_id = extract_arxiv_id(url)
+        paper = db.query(Paper).filter(Paper.arxiv_id == arxiv_id).first()
+        if paper:
+            return {"saved": True, "paper_id": str(paper.id)}
+
+    return {"saved": False, "paper_id": None}
+
+
 @router.get("/{paper_id}")
 def get_paper(
     paper_id: str,
