@@ -61,12 +61,85 @@
     #viewLink a:hover {
       text-decoration: underline;
     }
+    .tag-pill {
+      display: inline-flex;
+      align-items: center;
+      background: #e0f2fe;
+      color: #0369a1;
+      border-radius: 9999px;
+      padding: 3px 10px;
+      font-size: 12px;
+      font-weight: 500;
+      margin-right: 6px;
+      margin-bottom: 6px;
+      animation: fadeIn 0.15s ease-out;
+    }
+    .tag-pill .remove-tag {
+      margin-left: 6px;
+      cursor: pointer;
+      font-weight: bold;
+      color: #0284c7;
+    }
+    .tag-pill .remove-tag:hover {
+      color: #0369a1;
+    }
+    #tagInput {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 6px 10px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    #tagInput:focus {
+      border-color: #2563eb;
+      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+    }
+    #autocompleteContainer {
+      position: absolute;
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      max-height: 120px;
+      overflow-y: auto;
+      width: 100%;
+      box-sizing: border-box;
+      z-index: 10;
+      display: none;
+      margin-top: 2px;
+    }
+    .autocomplete-suggestion {
+      padding: 6px 10px;
+      cursor: pointer;
+      font-size: 13px;
+      color: #374151;
+      transition: background-color 0.1s;
+    }
+    .autocomplete-suggestion:hover, .autocomplete-suggestion.active {
+      background: #f3f4f6;
+      color: #111827;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
+    }
   </style>
 </head>
 <body>
   <h1>PaperStore</h1>
   <div id="status">Checking current page…</div>
   <div id="viewLink"><a href="#" target="_blank">View in Paperstore</a></div>
+  
+  <div id="tagSection" style="display: none; position: relative; margin-top: 14px; text-align: left;">
+    <h2 style="font-size: 13px; margin: 0 0 6px; font-weight: 600; color: #4b5563;">Tags</h2>
+    <div id="tagContainer" style="display: flex; flex-wrap: wrap; margin-bottom: 2px;"></div>
+    <input type="text" id="tagInput" placeholder="Add a tag (press Enter)..." autocomplete="off" />
+    <div id="autocompleteContainer"></div>
+  </div>
+
   <button id="addBtn" disabled>Add Paper</button>
   <button id="viewBtn" class="secondary">View in Paperstore</button>
   <button id="openBtn" class="secondary">Open Paperstore</button>

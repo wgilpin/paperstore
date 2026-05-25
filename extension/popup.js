@@ -27,6 +27,184 @@ function setStatus(cls, text) {
   statusEl.textContent = text;
 }
 
+const tagSection   = document.getElementById("tagSection");
+const tagContainer = document.getElementById("tagContainer");
+const tagInput     = document.getElementById("tagInput");
+const autocompleteContainer = document.getElementById("autocompleteContainer");
+
+let allTags = [];
+let currentPaperId = null;
+let currentPaperTags = [];
+let activeSuggestionIndex = -1;
+
+async function fetchAllTags() {
+  try {
+    const resp = await fetch(`${BACKEND}/tags`, { credentials: "include" });
+    if (resp.ok) {
+      const data = await resp.json();
+      allTags = data.tags || [];
+    }
+  } catch (e) {
+    console.error("Failed to fetch tags for autocomplete:", e);
+  }
+}
+
+async function loadPaperTags(paperId) {
+  try {
+    const resp = await fetch(`${BACKEND}/papers/${paperId}`, { credentials: "include" });
+    if (resp.ok) {
+      const data = await resp.json();
+      return data.paper?.tags || [];
+    }
+  } catch (e) {
+    console.error("Failed to load paper tags:", e);
+  }
+  return [];
+}
+
+async function showTagSection(paperId, initialTags = []) {
+  currentPaperId = paperId;
+  currentPaperTags = initialTags;
+  tagSection.style.display = "block";
+  renderTags();
+}
+
+function renderTags() {
+  tagContainer.innerHTML = "";
+  currentPaperTags.forEach(tag => {
+    const pill = document.createElement("span");
+    pill.className = "tag-pill";
+    pill.textContent = tag;
+    
+    const removeBtn = document.createElement("span");
+    removeBtn.className = "remove-tag";
+    removeBtn.textContent = "×";
+    removeBtn.addEventListener("click", () => removeTag(tag));
+    
+    pill.appendChild(removeBtn);
+    tagContainer.appendChild(pill);
+  });
+}
+
+async function addTag(tag) {
+  tag = tag.trim().toLowerCase();
+  if (!tag) return;
+  if (currentPaperTags.includes(tag)) {
+    tagInput.value = "";
+    closeAutocomplete();
+    return;
+  }
+  
+  currentPaperTags.push(tag);
+  tagInput.value = "";
+  closeAutocomplete();
+  renderTags();
+  await syncTags();
+}
+
+async function removeTag(tag) {
+  currentPaperTags = currentPaperTags.filter(t => t !== tag);
+  renderTags();
+  await syncTags();
+}
+
+async function syncTags() {
+  if (!currentPaperId) return;
+  try {
+    const resp = await fetch(`${BACKEND}/papers/${currentPaperId}/tags`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tags: currentPaperTags }),
+      credentials: "include"
+    });
+    if (!resp.ok) {
+      console.error("Failed to sync tags to server:", resp.status);
+    } else {
+      await fetchAllTags();
+    }
+  } catch (e) {
+    console.error("Failed to sync tags:", e);
+  }
+}
+
+tagInput.addEventListener("input", () => {
+  const query = tagInput.value.trim().toLowerCase();
+  if (!query) {
+    closeAutocomplete();
+    return;
+  }
+  
+  const matches = allTags.filter(t => t.toLowerCase().includes(query) && !currentPaperTags.includes(t));
+  if (matches.length === 0) {
+    closeAutocomplete();
+    return;
+  }
+  
+  renderAutocomplete(matches);
+});
+
+tagInput.addEventListener("keydown", (e) => {
+  const items = autocompleteContainer.querySelectorAll(".autocomplete-suggestion");
+  if (e.key === "ArrowDown") {
+    e.preventDefault();
+    activeSuggestionIndex = (activeSuggestionIndex + 1) % items.length;
+    updateActiveSuggestion(items);
+  } else if (e.key === "ArrowUp") {
+    e.preventDefault();
+    activeSuggestionIndex = (activeSuggestionIndex - 1 + items.length) % items.length;
+    updateActiveSuggestion(items);
+  } else if (e.key === "Enter") {
+    e.preventDefault();
+    if (activeSuggestionIndex >= 0 && activeSuggestionIndex < items.length) {
+      addTag(items[activeSuggestionIndex].textContent);
+    } else {
+      addTag(tagInput.value);
+    }
+  } else if (e.key === "Escape") {
+    closeAutocomplete();
+  }
+});
+
+function renderAutocomplete(matches) {
+  autocompleteContainer.innerHTML = "";
+  activeSuggestionIndex = -1;
+  
+  matches.forEach(match => {
+    const item = document.createElement("div");
+    item.className = "autocomplete-suggestion";
+    item.textContent = match;
+    item.addEventListener("click", () => {
+      addTag(match);
+    });
+    autocompleteContainer.appendChild(item);
+  });
+  
+  autocompleteContainer.style.display = "block";
+}
+
+function updateActiveSuggestion(items) {
+  items.forEach((item, idx) => {
+    if (idx === activeSuggestionIndex) {
+      item.classList.add("active");
+      item.scrollIntoView({ block: "nearest" });
+    } else {
+      item.classList.remove("active");
+    }
+  });
+}
+
+function closeAutocomplete() {
+  autocompleteContainer.style.display = "none";
+  autocompleteContainer.innerHTML = "";
+  activeSuggestionIndex = -1;
+}
+
+document.addEventListener("click", (e) => {
+  if (e.target !== tagInput && e.target !== autocompleteContainer) {
+    closeAutocomplete();
+  }
+});
+
 function isArxivHost(url) {
   try {
     const host = new URL(url).hostname;
@@ -124,6 +302,9 @@ async function submitPdf(tabUrl) {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   const url = tab.url || "";
 
+  // Pre-fetch all tags for autocomplete
+  await fetchAllTags();
+
   // Check if paper is already saved in Paperstore
   let isSaved = false;
   let savedPaperId = null;
@@ -147,6 +328,9 @@ async function submitPdf(tabUrl) {
     if (savedPaperId) {
       viewLinkA.href = `${BACKEND}/paper.html?id=${savedPaperId}`;
       viewLink.style.display = "block";
+      
+      const tags = await loadPaperTags(savedPaperId);
+      await showTagSection(savedPaperId, tags);
     }
     viewBtn.style.display = "";
     addBtn.textContent = "Close";
@@ -177,6 +361,9 @@ async function submitPdf(tabUrl) {
           if (paperId) {
             viewLinkA.href = `${BACKEND}/paper.html?id=${paperId}`;
             viewLink.style.display = "block";
+            
+            const tags = await loadPaperTags(paperId);
+            await showTagSection(paperId, tags);
           }
           viewBtn.style.display = "";
           addBtn.textContent = "Close";
@@ -208,6 +395,9 @@ async function submitPdf(tabUrl) {
           if (paperId) {
             viewLinkA.href = `${BACKEND}/paper.html?id=${paperId}`;
             viewLink.style.display = "block";
+            
+            const tags = await loadPaperTags(paperId);
+            await showTagSection(paperId, tags);
           }
           viewBtn.style.display = "";
           addBtn.textContent = "Close";

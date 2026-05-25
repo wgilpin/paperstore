@@ -22,6 +22,7 @@ from src.schemas.paper import (
     PaperSubmitRequest,
     PaperSummary,
     PaperUpdateRequest,
+    PaperTagsUpdateRequest,
 )
 from src.services.batch_metadata import _apply_metadata, _is_eligible
 from src.services.arxiv_client import ArxivUnavailableError
@@ -251,6 +252,21 @@ def update_paper(
     note = db.query(Note).filter(Note.paper_id == paper.id).first()
     assert note is not None
     return {"paper": _to_paper_detail(paper, note)}
+
+
+@router.patch("/{paper_id}/tags")
+def update_paper_tags(
+    paper_id: str,
+    body: PaperTagsUpdateRequest,
+    db: Session = Depends(get_session),
+) -> dict[str, list[str]]:
+    paper = db.query(Paper).filter(Paper.id == paper_id).first()
+    if paper is None:
+        raise HTTPException(status_code=404, detail="Paper not found")
+    _sync_tags(paper, body.tags, db)
+    db.commit()
+    db.refresh(paper)
+    return {"tags": _tag_names(paper)}
 
 
 @router.delete("/{paper_id}", status_code=204)

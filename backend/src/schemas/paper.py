@@ -116,3 +116,7 @@ class ErrorResponse(BaseModel):
     error: str
     detail: str | None = None
     paper_id: str | None = None
+
+
+class PaperTagsUpdateRequest(BaseModel):
+    tags: list[str] = Field(default_factory=list)
