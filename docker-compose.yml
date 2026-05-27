@@ -33,12 +33,16 @@ services:
       GOOGLE_TOKEN_PATH: /var/lib/paperstore/token/token.json
     networks:
       - gateway_net
+      - web-routing
       - default
 
 networks:
   gateway_net:
     external: true
+  web-routing:
+    external: true
 
 volumes:
   postgres_data:
   google_token:
+

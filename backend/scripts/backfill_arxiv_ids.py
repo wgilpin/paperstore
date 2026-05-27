@@ -39,7 +39,7 @@ from src.db import _get_engine  # noqa: E402
 from src.models.paper import Paper  # noqa: E402
 from src.models.paper_tag import paper_tags  # noqa: E402, F401
 from src.models.tag import Tag  # noqa: E402, F401
-from src.services.arxiv_client import extract_arxiv_id  # noqa: E402
+from src.services.arxiv_client import extract_arxiv_id, get_arxiv_client  # noqa: E402
 
 
 def _make_session():  # type: ignore[return]
@@ -63,7 +63,7 @@ def _search_arxiv(title: str) -> tuple[str, str] | None:
         max_results=1,
         sort_by=arxiv.SortCriterion.Relevance,
     )
-    client = arxiv.Client()
+    client = get_arxiv_client()
     results = list(client.results(search))
     if not results:
         return None

@@ -77,3 +77,18 @@ class TestArxivClientFetch:
 
         with pytest.raises(ValueError, match="Cannot extract"):
             extract_arxiv_id("https://example.com/paper.pdf")
+
+    def test_get_arxiv_client_user_agent_monkeypatch(self) -> None:
+        from src.services.arxiv_client import get_arxiv_client, _USER_AGENT
+        client = get_arxiv_client()
+
+        # Simulate a get call with the default library user-agent
+        with patch.object(client._session, "send") as mock_send:
+            # We patch send() which is what Session.request calls at the very end
+            mock_send.return_value = MagicMock(status_code=200)
+            client._session.get("http://example.com", headers={"user-agent": "arxiv.py/4.0.0"})
+
+            mock_send.assert_called_once()
+            request_obj = mock_send.call_args[0][0]
+            assert request_obj.headers["user-agent"] == _USER_AGENT
+
