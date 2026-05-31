@@ -397,13 +397,22 @@ def _parse_metadata(raw_text: str) -> ExtractedMetadata:
 
     return ExtractedMetadata(
         title=str(title) if title else None,
-        authors=[str(a).title().strip() for a in authors_raw] if isinstance(authors_raw, list) else [],
+        authors=(
+            [str(a).title().strip() for a in authors_raw]
+            if isinstance(authors_raw, list)
+            else []
+        ),
         date=str(date) if date else None,
         abstract=str(abstract) if abstract else None,
     )
 
 
-def _apply_metadata(paper: Paper, meta: ExtractedMetadata, *, overwrite_title: bool = False) -> None:
+def _apply_metadata(
+    paper: Paper,
+    meta: ExtractedMetadata,
+    *,
+    overwrite_title: bool = False,
+) -> None:
     """Write extracted fields to paper only if the field is currently empty.
 
     If overwrite_title is True, replace the title even if one already exists

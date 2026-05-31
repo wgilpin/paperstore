@@ -21,11 +21,11 @@ from src.schemas.paper import (
     PaperDetail,
     PaperSubmitRequest,
     PaperSummary,
-    PaperUpdateRequest,
     PaperTagsUpdateRequest,
+    PaperUpdateRequest,
 )
-from src.services.batch_metadata import _apply_metadata, _is_eligible
 from src.services.arxiv_client import ArxivUnavailableError
+from src.services.batch_metadata import _apply_metadata, _is_eligible
 from src.services.drive import DriveUploadError
 from src.services.gemini import GeminiService
 from src.services.ingestion import DuplicateError, IngestionService
@@ -321,7 +321,11 @@ def extract_metadata(
         logger.info("downloading PDF from Drive for paper %s", paper_id)
         t0 = time.monotonic()
         pdf_bytes = DriveService().download(paper.drive_file_id)
-        logger.info("Drive download complete in %.1fs (%d bytes)", time.monotonic() - t0, len(pdf_bytes))
+        logger.info(
+            "Drive download complete in %.1fs (%d bytes)",
+            time.monotonic() - t0,
+            len(pdf_bytes),
+        )
     except DriveUploadError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     try:

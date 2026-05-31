@@ -35,9 +35,9 @@ class SearchService:
             if sort == "published_date":
                 order = nulls_last(Paper.published_date.desc())
             elif sort == "title":
-                order = Paper.title.asc()
+                order = Paper.title.asc()  # type: ignore[assignment]
             else:
-                order = Paper.added_at.desc()
+                order = Paper.added_at.desc()  # type: ignore[assignment]
             base = db.query(Paper).order_by(order)
             if tag:
                 base = base.filter(

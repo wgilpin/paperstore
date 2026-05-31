@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 _MAX_PAGES = 2
 
 
-def _page_text(page: pdfplumber.page.Page) -> str:  # type: ignore[name-defined]
+def _page_text(page: pdfplumber.page.Page) -> str:
     """Extract text from a pdfplumber page using word-level joining to preserve spaces."""
     words = page.extract_words(x_tolerance=3, y_tolerance=3, keep_blank_chars=False)
     if not words:
@@ -71,16 +71,25 @@ class GeminiService:
             raise ValueError("GEMINI_PDF_MODEL environment variable is not set")
 
         text, pages_sent = _extract_first_pages_text(pdf_bytes, _MAX_PAGES)
-        logger.info("sending %d page(s) (%d chars) to Gemini model %s", pages_sent, len(text), model_name)
+        logger.info(
+            "sending %d page(s) (%d chars) to Gemini model %s",
+            pages_sent,
+            len(text),
+            model_name,
+        )
 
         client = genai.Client(api_key=api_key)
         response = client.models.generate_content(
             model=model_name,
-            contents=[_PROMPT, text],
+            contents=[_PROMPT, text],  # type: ignore[arg-type]
         )
 
-        logger.info("Gemini response received (%d chars)", len(response.text))
-        raw = response.text.strip()
+        resp_text = response.text
+        if not resp_text:
+            return ExtractedMetadata(title=None, authors=[], date=None, abstract=None)
+
+        logger.info("Gemini response received (%d chars)", len(resp_text))
+        raw = resp_text.strip()
         # Strip optional markdown code fence
         if raw.startswith("```"):
             raw = raw.split("```", 2)[1]
@@ -103,7 +112,11 @@ class GeminiService:
 
         return ExtractedMetadata(
             title=str(title) if title else None,
-            authors=[str(a).title().strip() for a in authors_raw] if isinstance(authors_raw, list) else [],
+            authors=(
+                [str(a).title().strip() for a in authors_raw]
+                if isinstance(authors_raw, list)
+                else []
+            ),
             date=str(date) if date else None,
             abstract=str(abstract) if abstract else None,
         )

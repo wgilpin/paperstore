@@ -96,7 +96,10 @@ def create_tables() -> None:
             NEW.search_vector :=
                 setweight(to_tsvector('english', coalesce(NEW.title, '')), 'A') ||
                 setweight(to_tsvector('english', coalesce(NEW.abstract, '')), 'B') ||
-                setweight(to_tsvector('simple',  coalesce(array_to_string(NEW.authors, ' '), '')), 'C');
+                setweight(
+                    to_tsvector('simple', coalesce(array_to_string(NEW.authors, ' '), '')),
+                    'C'
+                );
             RETURN NEW;
         END;
         $func$ LANGUAGE plpgsql;
@@ -117,7 +120,10 @@ def create_tables() -> None:
        SET search_vector =
                setweight(to_tsvector('english', coalesce(title, '')), 'A') ||
                setweight(to_tsvector('english', coalesce(abstract, '')), 'B') ||
-               setweight(to_tsvector('simple',  coalesce(array_to_string(authors, ' '), '')), 'C')
+               setweight(
+                   to_tsvector('simple', coalesce(array_to_string(authors, ' '), '')),
+                   'C'
+               )
      WHERE search_vector IS NULL;
     """
     with engine.connect() as conn:

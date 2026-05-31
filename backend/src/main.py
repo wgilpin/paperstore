@@ -7,28 +7,38 @@ import pathlib
 import zipfile
 from collections.abc import Awaitable, Callable
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s", datefmt="%H:%M:%S")
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.sessions import SessionMiddleware
+from starlette.responses import Response
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
+
+from src.db import create_tables
+from src.schemas.paper import ErrorResponse
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    datefmt="%H:%M:%S",
+)
 
 # Apply the same format to Uvicorn's loggers so they also show timestamps.
 for _uvicorn_logger in ("uvicorn", "uvicorn.error", "uvicorn.access"):
     _log = logging.getLogger(_uvicorn_logger)
     _log.handlers.clear()
     _handler = logging.StreamHandler()
-    _handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s", datefmt="%H:%M:%S"))
+    _handler.setFormatter(
+        logging.Formatter(
+            "%(asctime)s %(levelname)s %(name)s: %(message)s",
+            datefmt="%H:%M:%S",
+        )
+    )
     _log.addHandler(_handler)
     _log.propagate = False
-
-from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
-from fastapi.staticfiles import StaticFiles
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.middleware.sessions import SessionMiddleware
-from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
-from starlette.responses import Response
-
-from src.db import create_tables
-from src.schemas.paper import ErrorResponse
 
 app = FastAPI(title="PaperStore")
 
@@ -103,6 +113,30 @@ def startup() -> None:
         db.close()
 
 
+logger = logging.getLogger("src.main")
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
+    logger.error("Request validation failed: %s, body: %s", exc.errors(), exc.body)
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors()},
+    )
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
+    if exc.status_code == 422:
+        logger.error("HTTP 422 Exception: %s", exc.detail)
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+    )
+
+
 @app.exception_handler(Exception)
 async def _global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     # Import here to avoid circular imports at module level.
@@ -113,7 +147,9 @@ async def _global_exception_handler(request: Request, exc: Exception) -> JSONRes
     if isinstance(exc, DuplicateError):
         return JSONResponse(
             status_code=409,
-            content=ErrorResponse(error="duplicate", detail=str(exc), paper_id=exc.paper_id).model_dump(),
+            content=ErrorResponse(
+                error="duplicate", detail=str(exc), paper_id=exc.paper_id
+            ).model_dump(),
         )
     if isinstance(exc, NotFoundError):
         return JSONResponse(

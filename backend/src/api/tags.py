@@ -27,13 +27,13 @@ def list_tags(db: Session = Depends(get_session)) -> dict[str, list[str]]:
 @router.get("/with-counts")
 def list_tags_with_counts(db: Session = Depends(get_session)) -> dict[str, list[TagWithCount]]:
     rows = (
-        db.query(Tag.name, func.count(paper_tags.c.paper_id).label("count"))
+        db.query(Tag.name, func.count(paper_tags.c.paper_id).label("tag_count"))
         .outerjoin(paper_tags, Tag.id == paper_tags.c.tag_id)
         .group_by(Tag.name)
         .order_by(Tag.name.asc())
         .all()
     )
-    return {"tags": [TagWithCount(name=row.name, count=row.count) for row in rows]}
+    return {"tags": [TagWithCount(name=row.name, count=row.tag_count) for row in rows]}
 
 
 @router.post("/{name}/merge", status_code=204)
