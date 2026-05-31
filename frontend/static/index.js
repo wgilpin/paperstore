@@ -8,6 +8,7 @@ function initIndexPage() {
   const urlInput = document.getElementById('url-input');
   const addBtn = document.getElementById('add-btn');
   const addStatus = document.getElementById('add-status');
+  const fileInput = document.getElementById('file-input');
   const searchInput = document.getElementById('search-input');
   const sortSelect = document.getElementById('sort-select');
   const paperList = document.getElementById('paper-list');
@@ -216,6 +217,47 @@ function initIndexPage() {
       } else {
         addStatus.className = 'error';
         addStatus.textContent = data.detail || 'Failed to add paper.';
+      }
+    } catch {
+      addStatus.className = 'error';
+      addStatus.textContent = 'Network error — is the server running?';
+    } finally {
+      addBtn.disabled = false;
+    }
+  });
+
+  // Handle local PDF file upload instantly on selection
+  fileInput?.addEventListener('change', async () => {
+    const file = fileInput.files[0];
+    if (!file) return;
+
+    addBtn.disabled = true;
+    addStatus.className = '';
+    addStatus.textContent = 'Uploading and ingesting PDF…';
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const res = await fetch(`${API}/papers/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+      if (res.ok) {
+        addStatus.className = 'success';
+        addStatus.textContent = `Uploaded! Extracting metadata in the background — refresh shortly for the final title.`;
+        fileInput.value = '';
+        addForm.hidden = true;
+        currentPage = 1;
+        loadTags();
+        loadPapers();
+      } else if (res.status === 409) {
+        addStatus.className = 'error';
+        addStatus.textContent = 'A paper with this content or title is already in your library.';
+      } else {
+        addStatus.className = 'error';
+        addStatus.textContent = data.detail || 'Failed to upload PDF.';
       }
     } catch {
       addStatus.className = 'error';

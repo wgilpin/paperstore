@@ -217,6 +217,13 @@ function isPdfUrl(url) {
   catch { return false; }
 }
 
+function isScienceDirect(url) {
+  try {
+    const host = new URL(url).hostname;
+    return ["sciencedirect.com", "sciencedirectassets.com"].some(h => host === h || host.endsWith("." + h));
+  } catch { return false; }
+}
+
 function normalizeArxivUrl(url) {
   // Rewrite alphaxiv.org → arxiv.org so backend _is_arxiv_url() recognises it
   try {
@@ -237,6 +244,23 @@ function filenameFromUrl(url) {
   } catch { return "upload.pdf"; }
 }
 
+async function getErrorMessage(resp) {
+  let errMsg = `Server error ${resp.status}`;
+  try {
+    const data = await resp.json();
+    if (data && data.detail) {
+      if (typeof data.detail === "string") {
+        errMsg = data.detail;
+      } else if (Array.isArray(data.detail) && data.detail.length > 0) {
+        errMsg = data.detail[0].msg || JSON.stringify(data.detail);
+      } else if (typeof data.detail === "object") {
+        errMsg = data.detail.message || JSON.stringify(data.detail);
+      }
+    }
+  } catch { /* ignore */ }
+  return errMsg;
+}
+
 async function submitArxiv(tabUrl) {
   const resp = await fetch(`${BACKEND}/papers`, {
     method: "POST",
@@ -254,7 +278,9 @@ async function submitArxiv(tabUrl) {
       return { status: "duplicate", paperId: null };
     }
   }
-  if (!resp.ok) throw new Error(`Server error ${resp.status}`);
+  if (!resp.ok) {
+    throw new Error(await getErrorMessage(resp));
+  }
   try {
     const data = await resp.json();
     return { status: "success", paperId: data.paper?.id || null };
@@ -268,6 +294,17 @@ async function submitPdf(tabUrl) {
   const pdfResp = await fetch(tabUrl, { credentials: "include" });
   if (!pdfResp.ok) throw new Error(`Could not fetch PDF (${pdfResp.status})`);
   const blob = await pdfResp.blob();
+
+  // Validate PDF header bytes (%PDF)
+  const buffer = await blob.slice(0, 4).arrayBuffer();
+  const arr = new Uint8Array(buffer);
+  const header = String.fromCharCode(...arr);
+  
+  if (header !== "%PDF") {
+    console.warn("Downloaded file is not a PDF (header: " + header + "). Falling back to server-side ingestion.");
+    setStatus("submitting", "Self-healing: Fetching PDF via server\u2026");
+    return await submitArxiv(tabUrl);
+  }
 
   setStatus("submitting", "Uploading to PaperStore\u2026 This may take a minute, please wait.");
   const form = new FormData();
@@ -289,7 +326,9 @@ async function submitPdf(tabUrl) {
       return { status: "duplicate", paperId: null };
     }
   }
-  if (!resp.ok) throw new Error(`Server error ${resp.status}`);
+  if (!resp.ok) {
+    throw new Error(await getErrorMessage(resp));
+  }
   try {
     const data = await resp.json();
     return { status: "success", paperId: data.paper?.id || null };
@@ -339,6 +378,15 @@ async function submitPdf(tabUrl) {
       window.close();
     });
     return;
+  }
+
+  // Show paywall warning if we detect ScienceDirect or a general non-arXiv PDF
+  if (isScienceDirect(url) || (isPdfUrl(url) && !isArxivHost(url))) {
+    const warningEl = document.getElementById("paywallWarning");
+    if (warningEl) warningEl.style.display = "block";
+    
+    // Hide the Add button since saving will fail or is restricted
+    addBtn.style.display = "none";
   }
 
   if (isArxivHost(url)) {

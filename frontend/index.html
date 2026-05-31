@@ -26,9 +26,32 @@
     .add-toggle:hover { background: #f8fafc; box-shadow: 0 6px 20px rgba(0,0,0,0.16); }
     .add-form { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; }
     .add-form[hidden] { display: none; }
-    .add-form input { flex: 1; padding: 0.5rem 0.75rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; }
+    .add-form input[type="url"] { flex: 1; padding: 0.5rem 0.75rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; }
     .add-form button { padding: 0.5rem 1rem; background: #2563eb; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 1rem; }
     .add-form button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .file-upload-btn {
+      padding: 0.5rem 1rem;
+      background: #fff;
+      color: #1e293b;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 1rem;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      transition: background 0.15s, border-color 0.15s;
+      flex-shrink: 0;
+    }
+    .file-upload-btn:hover {
+      background: #f8fafc;
+      border-color: #94a3b8;
+    }
+    @media (max-width: 600px) {
+      .add-form { flex-direction: column; align-items: stretch; }
+      .add-form span { text-align: center; margin: 0.25rem 0; }
+    }
     #add-status { margin-bottom: 1rem; font-size: 0.9rem; min-height: 1.2em; }
     #add-status.error { color: #dc2626; }
     #add-status.success { color: #16a34a; }
@@ -111,8 +134,14 @@
     <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
   </button>
   <form class="add-form" id="add-form" hidden>
-    <input type="url" id="url-input" placeholder="Paste an arXiv URL or PDF URL…" required />
+    <input type="url" id="url-input" placeholder="Paste an arXiv URL or PDF URL…" />
     <button type="submit" id="add-btn">Add</button>
+    <span style="align-self: center; font-size: 0.85rem; color: #64748b; font-weight: 500; flex-shrink: 0;">or</span>
+    <label class="file-upload-btn" id="file-upload-label">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      Upload PDF
+      <input type="file" id="file-input" accept="application/pdf" style="display: none;" />
+    </label>
   </form>
   <div id="add-status"></div>
 
@@ -142,8 +171,8 @@
     <button id="next-btn">Next &rarr;</button>
   </div>
 
-  <script src="/static/utils.js?v=2"></script>
-  <script src="/static/index.js?v=2"></script>
+  <script src="/static/utils.js?v=3"></script>
+  <script src="/static/index.js?v=3"></script>
   <script>
     const hamburgerBtn = document.getElementById('hamburger-btn');
     const hamburgerMenu = document.getElementById('hamburger-menu');
