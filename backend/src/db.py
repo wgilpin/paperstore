@@ -55,6 +55,9 @@ def create_tables() -> None:
     import src.models.tag  # noqa: F401
 
     engine = _get_engine()
+    with engine.connect() as conn:
+        conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm;"))
+        conn.commit()
     Base.metadata.create_all(bind=engine)
 
     # Maintain search_vector via a trigger (GENERATED ALWAYS AS cannot use

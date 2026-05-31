@@ -1,19 +1,11 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: (none) → 1.0.0 (initial ratification)
-Modified principles: N/A (initial creation)
+Version change: 1.0.0 → 1.1.0 (added Principle VII: Commenting Strategy)
+Modified principles: N/A
 Added sections:
-  - Core Principles (I–VI)
-  - Technology Stack
-  - Development Workflow
-  - Governance
-Templates updated:
-  ✅ .specify/templates/plan-template.md — Constitution Check gates align with principles below
-  ✅ .specify/templates/spec-template.md — no constitution-driven mandatory section changes required
-  ✅ .specify/templates/tasks-template.md — test task guidance aligns with Principle III scope
-Follow-up TODOs:
-  - TODO(RATIFICATION_DATE): Set exact date when team formally ratifies; using initial-commit date as proxy.
+  - Core Principles (VII. Commenting Strategy)
+Templates updated: None
 -->
 
 # PaperStore Constitution
@@ -101,6 +93,16 @@ When in doubt, ask before building.
 **Rationale**: Prototype scope is especially prone to silent expansion. This principle keeps work
 aligned with stated requirements.
 
+### VII. Commenting Strategy
+
+All code files MUST follow a consistent, descriptive commenting strategy when created or edited:
+
+- Every function/endpoint MUST have at least a 1-liner docstring/comment explaining its purpose.
+- Long or complex functions MUST have inline comments explaining the logic step-by-step.
+- Comments MUST be updated whenever the corresponding code is edited.
+
+**Rationale**: Promotes readability, ensures that logic is self-documenting, and prevents comments from drifting from the implementation.
+
 ## Technology Stack
 
 | Concern | Choice |
@@ -159,4 +161,4 @@ constitution, or the constitution MUST be amended first.
 All pull requests / code reviews MUST verify compliance with these principles. Violations MUST be
 called out and resolved before merge.
 
-**Version**: 1.0.0 | **Ratified**: 2026-02-25 | **Last Amended**: 2026-02-25
+**Version**: 1.1.0 | **Ratified**: 2026-02-25 | **Last Amended**: 2026-05-31

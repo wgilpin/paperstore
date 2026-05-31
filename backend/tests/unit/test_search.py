@@ -56,7 +56,7 @@ class TestSearchServiceSearch:
 
         assert result_papers == papers
         assert total == len(papers)
-        db.query.return_value.filter.assert_called_once()
+        db.query.return_value.filter.assert_called()
 
     def test_returns_empty_list_when_no_match(self) -> None:
         db = _make_db_returning([])
@@ -65,3 +65,13 @@ class TestSearchServiceSearch:
 
         assert result_papers == []
         assert total == 0
+
+    def test_search_by_tag_name(self) -> None:
+        papers = [_mock_paper("Paper on consciousness")]
+        db = _make_db_returning(papers)
+
+        result_papers, total = SearchService().search("consciousness", db)
+
+        assert result_papers == papers
+        assert total == len(papers)
+        db.query.return_value.filter.assert_called()

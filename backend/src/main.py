@@ -92,8 +92,22 @@ class AuthMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
+class NoCacheMiddleware(BaseHTTPMiddleware):
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
+        response = await call_next(request)
+        path = request.url.path
+        if path.startswith("/api") or path.startswith("/papers") or path.startswith("/tags"):
+            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
+        return response
+
+
 # SessionMiddleware must wrap AuthMiddleware (added after so it runs first).
 app.add_middleware(AuthMiddleware)
+app.add_middleware(NoCacheMiddleware)
 app.add_middleware(
     SessionMiddleware,
     secret_key=os.environ.get("SESSION_SECRET", "dev-secret-change-me"),

@@ -4,7 +4,7 @@ import os
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
-from sqlalchemy import func
+from sqlalchemy import case, func, nulls_last
 from sqlalchemy.orm import Session
 
 from src.db import get_session
@@ -33,11 +33,53 @@ def search_papers(
     since: datetime | None = Query(default=None),
     db: Session = Depends(get_session),
 ) -> list[SearchPaper]:
+    """Search for papers by matching query against metadata and tags.
+
+    Supports FTS, fuzzy tag matching, and tie-breaker sorting.
+    """
+    # Build full-text search query from search term
     tsquery = func.plainto_tsquery("english", q)
+
+    # Check if the paper has any tag matching the search query.
+    # We match tags using three fallback levels:
+    # 1. Full-text search (stemmed matching): to_tsvector('english', tag) @@ query
+    # 2. Trigram similarity (typo tolerance): tag % query (requires pg_trgm extension)
+    # 3. Substring matching (case-insensitive partial matching): tag ILIKE %query%
+    tag_match_filter = Paper.id.in_(
+        db.query(paper_tags.c.paper_id)
+        .join(Tag, Tag.id == paper_tags.c.tag_id)
+        .filter(
+            func.to_tsvector("english", Tag.name).op("@@")(tsquery) |
+            Tag.name.op("%")(q) |
+            Tag.name.ilike(f"%{q}%")
+        )
+    )
+
+    # Boost relevance rank by 1.0 if a tag matched the query
+    tag_matched_case = case(
+        (tag_match_filter, 1.0),
+        else_=0.0
+    )
+
+    # We calculate the relevance score for FTS semantic matching
+    rank_expr = func.ts_rank(Paper.search_vector, tsquery)
+
+    # Unified sorting order to satisfy conditional query types:
+    # 1. tag_matched_case.desc(): Group tag-matched papers (1.0) above semantic-only papers (0.0).
+    # 2. Sort tag-matched papers by added_at descending (most recently added first).
+    # 3. Sort semantic-only papers by FTS relevance/closeness (rank_expr desc).
+    # 4. Paper.added_at.desc(): Ultimate tie-breaker for identical semantic ranks.
+    order_by_clauses = [
+        tag_matched_case.desc(),
+        nulls_last(case(((tag_matched_case == 1.0, Paper.added_at)), else_=None).desc()),
+        nulls_last(case(((tag_matched_case == 0.0, rank_expr)), else_=None).desc()),
+        Paper.added_at.desc()
+    ]
+
     base = (
         db.query(Paper)
-        .filter(Paper.search_vector.op("@@")(tsquery))
-        .order_by(func.ts_rank(Paper.search_vector, tsquery).desc())
+        .filter(Paper.search_vector.op("@@")(tsquery) | tag_match_filter)
+        .order_by(*order_by_clauses)
     )
     if tag:
         base = base.filter(
