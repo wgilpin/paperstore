@@ -267,9 +267,13 @@ function initIndexPage() {
     }
   });
 
-  // Search — Enter key or button click triggers search
+  // Search — Enter key, search button click, or clearing/canceling the search input triggers list reload.
   searchInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') { currentPage = 1; loadPapers(); }
+  });
+  searchInput.addEventListener('search', () => {
+    currentPage = 1;
+    loadPapers();
   });
   bannerSearchBtn.addEventListener('click', () => { currentPage = 1; loadPapers(); });
 
