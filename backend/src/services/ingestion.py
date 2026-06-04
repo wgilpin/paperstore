@@ -1,5 +1,6 @@
 """Paper ingestion service — orchestrates fetch, upload, and persistence."""
 
+import logging
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -7,9 +8,15 @@ from sqlalchemy.orm import Session
 
 from src.models.note import Note
 from src.models.paper import Paper
-from src.services.arxiv_client import ArxivClient, extract_arxiv_id
+from src.services.arxiv_client import (
+    ArxivClient,
+    ArxivUnavailableError,
+    extract_arxiv_id,
+)
 from src.services.drive import DriveService
 from src.services.pdf_parser import PdfParser
+
+logger = logging.getLogger(__name__)
 
 _ARXIV_HOSTNAMES = {"arxiv.org", "ar5iv.labs.arxiv.org"}
 
@@ -59,9 +66,19 @@ class IngestionService:
                     "Paper already exists in your library",
                     paper_id=str(existing.id),
                 )
-            metadata = self._arxiv.fetch(url)
-            pdf_url = f"https://arxiv.org/pdf/{arxiv_id}"
-            _, pdf_bytes = self._pdf.download_and_extract(pdf_url)
+            try:
+                metadata = self._arxiv.fetch(url)
+                pdf_url = f"https://arxiv.org/pdf/{arxiv_id}"
+                _, pdf_bytes = self._pdf.download_and_extract(pdf_url)
+            except ArxivUnavailableError as exc:
+                logger.warning(
+                    "arXiv API failed for %s, falling back to direct PDF download: %s",
+                    arxiv_id,
+                    exc,
+                )
+                pdf_url = f"https://arxiv.org/pdf/{arxiv_id}"
+                metadata, pdf_bytes = self._pdf.download_and_extract(pdf_url)
+                metadata["arxiv_id"] = arxiv_id
         else:
             metadata, pdf_bytes = self._pdf.download_and_extract(url)
 

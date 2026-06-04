@@ -103,6 +103,9 @@ def submit_paper(
     except DriveUploadError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     except ArxivUnavailableError as exc:
+        logger.exception(
+            "arXiv API unavailable during ingestion of %s", body.url
+        )
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     if _is_eligible(paper):

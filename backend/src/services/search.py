@@ -80,7 +80,8 @@ class SearchService:
         rank_expr = func.ts_rank(Paper.search_vector, tsquery)
 
         # Unified sorting order to satisfy conditional query types:
-        # 1. tag_matched_case.desc(): Group tag-matched papers (1.0) above semantic-only papers (0.0).
+        # 1. tag_matched_case.desc(): Group tag-matched papers (1.0)
+        #    above semantic-only papers (0.0).
         # 2. Sort tag-matched papers by added_at descending (most recently added first).
         # 3. Sort semantic-only papers by FTS relevance/closeness (rank_expr desc).
         # 4. Paper.added_at.desc(): Ultimate tie-breaker for identical semantic ranks.
