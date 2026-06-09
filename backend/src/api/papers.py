@@ -6,7 +6,7 @@ import time
 from pathlib import Path
 from typing import Literal
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -38,6 +38,7 @@ router = APIRouter()
 
 def _enrich_paper_async(paper_id: str, drive_file_id: str) -> None:
     """Spawn a daemon thread to extract metadata via Gemini and apply it to empty fields."""
+
     def _run() -> None:
         from sqlalchemy.orm import sessionmaker
 
@@ -81,6 +82,33 @@ def _to_paper_detail(paper: Paper, note: Note) -> PaperDetail:
     )
 
 
+@router.get("/receive-share", response_class=RedirectResponse)
+def receive_share(
+    request: Request,
+    url: str | None = None,
+    title: str | None = None,
+    text: str | None = None,
+) -> RedirectResponse:
+    if not request.session.get("authenticated"):
+        return RedirectResponse("/auth/login")
+
+    # Android often places the URL in the text field rather than url
+    resolved_url = url or ""
+    if not resolved_url and text:
+        import re
+
+        match = re.search(r"https?://\S+", text)
+        if match:
+            resolved_url = match.group(0)
+
+    if resolved_url:
+        from urllib.parse import urlencode
+
+        query = urlencode({"add_url": resolved_url})
+        return RedirectResponse(f"/?{query}", status_code=303)
+    return RedirectResponse("/", status_code=303)
+
+
 @router.post("", status_code=201)
 def submit_paper(
     body: PaperSubmitRequest,
@@ -92,20 +120,14 @@ def submit_paper(
     except DuplicateError as exc:
         raise HTTPException(
             status_code=409,
-            detail={
-                "error": "duplicate",
-                "message": str(exc),
-                "paper_id": exc.paper_id
-            }
+            detail={"error": "duplicate", "message": str(exc), "paper_id": exc.paper_id},
         ) from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except DriveUploadError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     except ArxivUnavailableError as exc:
-        logger.exception(
-            "arXiv API unavailable during ingestion of %s", body.url
-        )
+        logger.exception("arXiv API unavailable during ingestion of %s", body.url)
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     if _is_eligible(paper):
@@ -130,18 +152,12 @@ def upload_paper(
     svc = IngestionService()
     try:
         paper = svc.ingest_local(
-            pdf_bytes=pdf_bytes,
-            local_path=local_path,
-            source_url=source_url,
-            db=db)
+            pdf_bytes=pdf_bytes, local_path=local_path, source_url=source_url, db=db
+        )
     except DuplicateError as exc:
         raise HTTPException(
             status_code=409,
-            detail={
-                "error": "duplicate",
-                "message": str(exc),
-                "paper_id": exc.paper_id
-            }
+            detail={"error": "duplicate", "message": str(exc), "paper_id": exc.paper_id},
         ) from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -290,6 +306,7 @@ def delete_paper(
             db.delete(tag)
     db.commit()
     from src.services.drive import DriveService
+
     DriveService().delete(drive_file_id)
 
 

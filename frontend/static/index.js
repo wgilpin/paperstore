@@ -45,6 +45,20 @@ function initIndexPage() {
   if (initParams.get('sort')) sortSelect.value = initParams.get('sort');
   if (initParams.get('tag')) activeTag = initParams.get('tag');
 
+  const addUrl = initParams.get('add_url');
+  if (addUrl) {
+    // Strip add_url from history immediately so a reload won't trigger it again
+    const cleanUrl = new URL(window.location.href);
+    cleanUrl.searchParams.delete('add_url');
+    window.history.replaceState(null, '', cleanUrl.pathname + cleanUrl.search);
+
+    addForm.hidden = false;
+    urlInput.value = addUrl;
+    setTimeout(() => {
+      addForm.requestSubmit();
+    }, 100);
+  }
+
   // Load tags for filter bar, then load papers; also check batch job status on load
   loadTags().then(() => loadPapers());
   checkBatchStatus();

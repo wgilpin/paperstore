@@ -8,8 +8,7 @@ from src.services.types import PaperMetadata
 # arXiv's edge (Fastly) rate-limits the arxiv library's default UA aggressively.
 # A descriptive UA with contact info is accepted. See arXiv API Terms of Use.
 _USER_AGENT = (
-    "PaperStoreApp/1.0 (+https://github.com/wgilpin/paperstore; "
-    "contact: wgilpin@gmail.com)"
+    "PaperStoreApp/1.0 (+https://github.com/wgilpin/paperstore; contact: wgilpin@gmail.com)"
 )
 
 # Matches new-style IDs like 2301.00001 (with optional version suffix).
@@ -44,9 +43,7 @@ def get_arxiv_client() -> arxiv.Client:
     client = arxiv.Client()
     original_request = client._session.request
 
-    def custom_request(
-        method: str, url: str, *args: Any, **kwargs: Any
-    ) -> Any:
+    def custom_request(method: str, url: str, *args: Any, **kwargs: Any) -> Any:
         headers = kwargs.get("headers") or {}
         # Match case-insensitive user-agent values starting with 'arxiv.py/'
         ua = headers.get("user-agent") or headers.get("User-Agent")
@@ -88,4 +85,3 @@ class ArxivClient:
             abstract=result.summary,
             arxiv_id=arxiv_id,
         )
-

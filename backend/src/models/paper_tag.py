@@ -9,7 +9,9 @@ paper_tags = Table(
     "paper_tags",
     Base.metadata,
     Column(
-        "paper_id", UUID(as_uuid=True), ForeignKey("papers.id", ondelete="CASCADE"),
+        "paper_id",
+        UUID(as_uuid=True),
+        ForeignKey("papers.id", ondelete="CASCADE"),
         primary_key=True,
     ),
     Column(

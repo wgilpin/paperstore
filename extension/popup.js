@@ -392,6 +392,7 @@ async function submitPdf(tabUrl) {
   if (isArxivHost(url)) {
     setStatus("", "Ready to add this arXiv paper.");
     addBtn.disabled = false;
+    showTagSection(null, []);
     addBtn.addEventListener("click", async () => {
       if (addBtn.textContent === "Close") {
         window.close();
@@ -410,8 +411,11 @@ async function submitPdf(tabUrl) {
             viewLinkA.href = `${BACKEND}/paper.html?id=${paperId}`;
             viewLink.style.display = "block";
             
-            const tags = await loadPaperTags(paperId);
-            await showTagSection(paperId, tags);
+            const serverTags = await loadPaperTags(paperId);
+            currentPaperId = paperId;
+            currentPaperTags = Array.from(new Set([...currentPaperTags, ...serverTags]));
+            renderTags();
+            await syncTags();
           }
           viewBtn.style.display = "";
           addBtn.textContent = "Close";
@@ -427,6 +431,7 @@ async function submitPdf(tabUrl) {
   } else if (isPdfUrl(url)) {
     setStatus("", "Ready to upload this PDF.");
     addBtn.disabled = false;
+    showTagSection(null, []);
     addBtn.addEventListener("click", async () => {
       if (addBtn.textContent === "Close") {
         window.close();
@@ -444,8 +449,11 @@ async function submitPdf(tabUrl) {
             viewLinkA.href = `${BACKEND}/paper.html?id=${paperId}`;
             viewLink.style.display = "block";
             
-            const tags = await loadPaperTags(paperId);
-            await showTagSection(paperId, tags);
+            const serverTags = await loadPaperTags(paperId);
+            currentPaperId = paperId;
+            currentPaperTags = Array.from(new Set([...currentPaperTags, ...serverTags]));
+            renderTags();
+            await syncTags();
           }
           viewBtn.style.display = "";
           addBtn.textContent = "Close";

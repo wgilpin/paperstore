@@ -26,8 +26,7 @@ class DriveService:
             token_path = os.environ.get("GOOGLE_TOKEN_PATH", "token.json")
             if not os.path.exists(token_path):
                 raise DriveUploadError(
-                    f"Google OAuth token not found at {token_path}. "
-                    "Complete the OAuth flow first."
+                    f"Google OAuth token not found at {token_path}. Complete the OAuth flow first."
                 )
             creds = Credentials.from_authorized_user_file(token_path)  # type: ignore[no-untyped-call]
             self._service = build("drive", "v3", credentials=creds)

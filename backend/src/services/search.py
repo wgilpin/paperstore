@@ -64,17 +64,14 @@ class SearchService:
             db.query(paper_tags.c.paper_id)
             .join(Tag, Tag.id == paper_tags.c.tag_id)
             .filter(
-                func.to_tsvector("english", Tag.name).op("@@")(tsquery) |
-                Tag.name.op("%")(query) |
-                Tag.name.ilike(f"%{query}%")
+                func.to_tsvector("english", Tag.name).op("@@")(tsquery)
+                | Tag.name.op("%")(query)
+                | Tag.name.ilike(f"%{query}%")
             )
         )
 
         # Boost relevance rank by 1.0 if a tag matched the query
-        tag_matched_case = case(
-            (tag_match_filter, 1.0),
-            else_=0.0
-        )
+        tag_matched_case = case((tag_match_filter, 1.0), else_=0.0)
 
         # We calculate the relevance score for FTS semantic matching
         rank_expr = func.ts_rank(Paper.search_vector, tsquery)
@@ -89,7 +86,7 @@ class SearchService:
             tag_matched_case.desc(),
             nulls_last(case(((tag_matched_case == 1.0, Paper.added_at)), else_=None).desc()),
             nulls_last(case(((tag_matched_case == 0.0, rank_expr)), else_=None).desc()),
-            Paper.added_at.desc()
+            Paper.added_at.desc(),
         ]
 
         base = (

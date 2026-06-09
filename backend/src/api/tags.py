@@ -56,11 +56,7 @@ def merge_tag(name: str, body: TagMergeRequest, db: Session = Depends(get_sessio
         )
     )
     # Reassign remaining source rows to target
-    db.execute(
-        paper_tags.update()
-        .where(paper_tags.c.tag_id == source.id)
-        .values(tag_id=target.id)
-    )
+    db.execute(paper_tags.update().where(paper_tags.c.tag_id == source.id).values(tag_id=target.id))
     db.delete(source)
     db.commit()
 

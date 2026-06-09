@@ -23,6 +23,7 @@ _ARXIV_HOSTNAMES = {"arxiv.org", "ar5iv.labs.arxiv.org"}
 
 class DuplicateError(Exception):
     """Raised when the submitted paper already exists in the library."""
+
     def __init__(self, message: str, paper_id: str | None = None) -> None:
         super().__init__(message)
         self.paper_id = paper_id

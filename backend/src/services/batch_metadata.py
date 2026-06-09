@@ -398,9 +398,7 @@ def _parse_metadata(raw_text: str) -> ExtractedMetadata:
     return ExtractedMetadata(
         title=str(title) if title else None,
         authors=(
-            [str(a).title().strip() for a in authors_raw]
-            if isinstance(authors_raw, list)
-            else []
+            [str(a).title().strip() for a in authors_raw] if isinstance(authors_raw, list) else []
         ),
         date=str(date) if date else None,
         abstract=str(abstract) if abstract else None,

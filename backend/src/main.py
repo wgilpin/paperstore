@@ -52,7 +52,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-_AUTH_EXEMPT_PREFIXES = ("/auth/", "/api/")
+_AUTH_EXEMPT_PREFIXES = (
+    "/auth/",
+    "/api/",
+    "/manifest.json",
+    "/service-worker.js",
+    "/papers/receive-share",
+    "/static/icons/",
+)
 
 
 def _load_credentials() -> bool:

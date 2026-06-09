@@ -27,8 +27,7 @@ class PdfParser:
                 "Chrome/124.0.0.0 Safari/537.36"
             ),
             "Accept": (
-                "application/pdf,application/xhtml+xml,application/xml;"
-                "q=0.9,image/webp,*/*;q=0.8"
+                "application/pdf,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
             ),
             "Accept-Language": "en-US,en;q=0.5",
         }
@@ -78,8 +77,6 @@ class PdfParser:
         """Extract all text from a PDF using pdfplumber. Returns None on failure."""
         try:
             with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
-                return "\n\n".join(
-                    page.extract_text() or "" for page in pdf.pages
-                ).strip() or None
+                return "\n\n".join(page.extract_text() or "" for page in pdf.pages).strip() or None
         except Exception:
             return None

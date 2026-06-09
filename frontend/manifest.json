@@ -1,0 +1,21 @@
+{
+  "name": "PaperStore",
+  "short_name": "PaperStore",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#1e293b",
+  "background_color": "#f1f5f9",
+  "icons": [
+    { "src": "/static/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/static/icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ],
+  "share_target": {
+    "action": "/papers/receive-share",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  }
+}

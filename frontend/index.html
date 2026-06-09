@@ -4,6 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PaperStore</title>
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#1e293b" />
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html { overflow-x: hidden; }
@@ -187,6 +189,15 @@
     });
     document.addEventListener('click', () => { hamburgerMenu.hidden = true; });
     hamburgerMenu.addEventListener('click', (e) => e.stopPropagation());
+  </script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/service-worker.js', { scope: '/' })
+          .then(reg => console.log('Service Worker registered', reg))
+          .catch(err => console.error('Service Worker registration failed', err));
+      });
+    }
   </script>
 </body>
 </html>
