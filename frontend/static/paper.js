@@ -399,9 +399,37 @@ function initPaperPage() {
       }
     }
 
+    function renderMarkdownWithMath(text) {
+      const placeholders = [];
+      
+      // 1. Replace block math $$...$$
+      let processedText = text.replace(/\$\$([\s\S]*?)\$\$/g, (match, math) => {
+        const placeholder = `@@BLOCKMATH${placeholders.length}@@`;
+        placeholders.push({ placeholder, math: `$$${math}$$` });
+        return placeholder;
+      });
+      
+      // 2. Replace inline math $...$
+      processedText = processedText.replace(/\$([^\$\s][^\$\n]*?[^\$\s]|[^\$\s])\$/g, (match, math) => {
+        const placeholder = `@@INLINEMATH${placeholders.length}@@`;
+        placeholders.push({ placeholder, math: `$${math}$` });
+        return placeholder;
+      });
+      
+      // 3. Parse Markdown
+      let html = marked.parse(processedText);
+      
+      // 4. Restore math placeholders
+      for (const item of placeholders) {
+        html = html.replace(item.placeholder, item.math);
+      }
+      
+      return html;
+    }
+
     function displaySummary(text, hasImage) {
       summaryCard.hidden = false;
-      summaryText.innerHTML = marked.parse(text);
+      summaryText.innerHTML = renderMarkdownWithMath(text);
       
       // Render LaTeX equations in the summary text container
       if (window.renderMathInElement) {
