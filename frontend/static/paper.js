@@ -76,6 +76,8 @@ function initPaperPage() {
     setupEditForm(paper);
     setupExtractButton(paper);
     setupSummary(paper);
+    setupTabs();
+    setupImageZoom();
   }
 
   function setupInlineTags(paper) {
@@ -466,6 +468,64 @@ function initPaperPage() {
     regenSummaryBtn.addEventListener('click', () => {
       const instructions = summaryInstructions.value.trim();
       triggerGeneration(instructions);
+    });
+  }
+
+  function setupTabs() {
+    const tabLinks = document.querySelectorAll('.tab-link');
+    tabLinks.forEach(link => {
+      link.addEventListener('click', () => {
+        const tabId = link.getAttribute('data-tab');
+        
+        tabLinks.forEach(l => {
+          l.classList.remove('active');
+        });
+        link.classList.add('active');
+        
+        document.querySelectorAll('.tab-content').forEach(content => {
+          content.style.display = 'none';
+        });
+        
+        const targetContent = document.getElementById(tabId);
+        if (targetContent) {
+          targetContent.style.display = 'block';
+        }
+      });
+    });
+  }
+
+  function setupImageZoom() {
+    const img = document.getElementById('summary-image');
+    const overlay = document.getElementById('image-overlay');
+    const overlayImg = document.getElementById('overlay-img');
+
+    if (!img || !overlay || !overlayImg) return;
+
+    function openOverlay() {
+      overlayImg.src = img.src;
+      overlay.style.display = 'flex';
+      // Force a browser reflow
+      overlay.offsetHeight;
+      overlay.style.opacity = '1';
+      overlayImg.style.transform = 'scale(1)';
+    }
+
+    function closeOverlay() {
+      overlay.style.opacity = '0';
+      overlayImg.style.transform = 'scale(0.95)';
+      setTimeout(() => {
+        overlay.style.display = 'none';
+        overlayImg.src = '';
+      }, 200);
+    }
+
+    img.addEventListener('click', openOverlay);
+    overlay.addEventListener('click', closeOverlay);
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && overlay.style.display === 'flex') {
+        closeOverlay();
+      }
     });
   }
 }

@@ -105,8 +105,16 @@ class NoCacheMiddleware(BaseHTTPMiddleware):
     ) -> Response:
         response = await call_next(request)
         path = request.url.path
-        if path.startswith("/api") or path.startswith("/papers") or path.startswith("/tags"):
+        if (
+            path.startswith("/api")
+            or path.startswith("/papers")
+            or path.startswith("/tags")
+        ):
             response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
+        elif path.endswith(".html") or path == "/":
+            response.headers["Cache-Control"] = "no-cache"
             response.headers["Pragma"] = "no-cache"
             response.headers["Expires"] = "0"
         return response
