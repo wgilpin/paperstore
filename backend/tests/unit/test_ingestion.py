@@ -150,7 +150,10 @@ class TestIngestionServiceIngest:
         mock_arxiv.fetch.side_effect = ArxivUnavailableError("arXiv API down")
         mock_pdf = MagicMock()
         # Ensure pdf_parser extract_metadata returns a fallback metadata dict
-        mock_pdf.download_and_extract.return_value = (_paper_metadata(title="Direct Fallback Title"), b"%PDF")
+        mock_pdf.download_and_extract.return_value = (
+            _paper_metadata(title="Direct Fallback Title"),
+            b"%PDF",
+        )
         mock_drive = MagicMock()
         mock_drive.upload.return_value = _drive_result()
 
@@ -161,7 +164,7 @@ class TestIngestionServiceIngest:
         # Confirm fetch failed, and we called download_and_extract with the PDF URL
         mock_arxiv.fetch.assert_called_once()
         mock_pdf.download_and_extract.assert_called_once_with("https://arxiv.org/pdf/2606.99999")
-        
+
         # Check that the paper has the correct fields populated from fallback and logic
         assert paper.title == "Direct Fallback Title"
         assert paper.arxiv_id == "2606.99999"

@@ -24,22 +24,22 @@ class TestPaperTagsUpdate:
         db = MagicMock()
         db.query.return_value.filter.return_value.first.side_effect = [
             mock_paper,  # first call: db.query(Paper)
-            None,        # second call: db.query(Tag) for "ai"
-            None,        # third call: db.query(Tag) for "neural-networks"
+            None,  # second call: db.query(Tag) for "ai"
+            None,  # third call: db.query(Tag) for "neural-networks"
         ]
 
         body = PaperTagsUpdateRequest(tags=["ai", "neural-networks"])
-        
+
         # Call API function directly
         result = update_paper_tags(str(paper_id), body, db)
 
         # Assert paper was queried
         db.query.assert_called()
-        
+
         # Verify db was committed and refreshed
         db.commit.assert_called_once()
         db.refresh.assert_called_once_with(mock_paper)
-        
+
         # Result should be a dictionary with tags
         assert "tags" in result
         assert isinstance(result["tags"], list)

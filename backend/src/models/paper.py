@@ -6,7 +6,7 @@ import uuid
 from datetime import date, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ARRAY, FetchedValue, Index, String, Text, func
+from sqlalchemy import ARRAY, FetchedValue, Index, LargeBinary, String, Text, func
 from sqlalchemy.dialects.postgresql import TSVECTOR, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -30,6 +30,8 @@ class Paper(Base):
     drive_view_url: Mapped[str] = mapped_column(Text, nullable=False)
     metadata_skip_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     extracted_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    summary_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    summary_image: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
     added_at: Mapped[datetime] = mapped_column(nullable=False, server_default=func.now())
     # search_vector is a GENERATED ALWAYS column — created by raw DDL in create_tables().
     # server_default=FetchedValue() tells SQLAlchemy the DB owns this column;

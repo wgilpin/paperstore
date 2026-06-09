@@ -79,7 +79,8 @@ class TestArxivClientFetch:
             extract_arxiv_id("https://example.com/paper.pdf")
 
     def test_get_arxiv_client_user_agent_monkeypatch(self) -> None:
-        from src.services.arxiv_client import get_arxiv_client, _USER_AGENT
+        from src.services.arxiv_client import _USER_AGENT, get_arxiv_client
+
         client = get_arxiv_client()
 
         # Simulate a get call with the default library user-agent
@@ -91,4 +92,3 @@ class TestArxivClientFetch:
             mock_send.assert_called_once()
             request_obj = mock_send.call_args[0][0]
             assert request_obj.headers["user-agent"] == _USER_AGENT
-

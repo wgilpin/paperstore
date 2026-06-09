@@ -77,7 +77,9 @@ class TestPdfParserDownloadAndExtract:
         mock_response.headers = {"content-type": "application/pdf"}
         mock_response.content = _PDF_MAGIC
 
-        mock_ctx = _make_pdfplumber_mock({}, first_page_text="Attention Is All You Need\nAuthors...")
+        mock_ctx = _make_pdfplumber_mock(
+            {}, first_page_text="Attention Is All You Need\nAuthors..."
+        )
 
         with (
             patch("src.services.pdf_parser.httpx.get", return_value=mock_response),

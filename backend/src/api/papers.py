@@ -6,7 +6,17 @@ import time
 from pathlib import Path
 from typing import Literal
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    UploadFile,
+)
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -24,12 +34,14 @@ from src.schemas.paper import (
     PaperTagsUpdateRequest,
     PaperUpdateRequest,
 )
+from src.schemas.summary import SummaryGenerateRequest, SummaryResponse
 from src.services.arxiv_client import ArxivUnavailableError
 from src.services.batch_metadata import _apply_metadata, _is_eligible
 from src.services.drive import DriveUploadError
 from src.services.gemini import GeminiService
 from src.services.ingestion import DuplicateError, IngestionService
 from src.services.search import SearchService
+from src.services.summary import SummaryService
 
 logger = logging.getLogger(__name__)
 
@@ -364,3 +376,57 @@ def get_pdf(
     if paper is None:
         raise HTTPException(status_code=404, detail="Paper not found")
     return RedirectResponse(url=paper.drive_view_url, status_code=302)
+
+
+@router.get("/{paper_id}/summary", response_model=SummaryResponse)
+def get_paper_summary(
+    paper_id: str,
+    db: Session = Depends(get_session),
+) -> SummaryResponse:
+    """Get the cached paper summary."""
+    try:
+        summary_text, has_image = SummaryService().get_summary(paper_id, db)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return SummaryResponse(summary_text=summary_text, has_image=has_image)
+
+
+@router.post("/{paper_id}/summary", response_model=SummaryResponse)
+def generate_paper_summary(
+    paper_id: str,
+    body: SummaryGenerateRequest | None = None,
+    db: Session = Depends(get_session),
+) -> SummaryResponse:
+    """Generate or regenerate the paper summary."""
+    instructions = body.instructions if body else None
+    try:
+        summary_text, has_image = SummaryService().generate_summary(
+            paper_id=paper_id, db=db, instructions=instructions
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Summary generation failed")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    return SummaryResponse(summary_text=summary_text, has_image=has_image)
+
+
+@router.get("/{paper_id}/summary-image")
+def get_paper_summary_image(
+    paper_id: str,
+    db: Session = Depends(get_session),
+) -> Response:
+    """Get the cached paper summary whiteboard image."""
+    paper = db.query(Paper).filter(Paper.id == paper_id).first()
+    if paper is None:
+        raise HTTPException(status_code=404, detail="Paper not found")
+    if not paper.summary_image:
+        raise HTTPException(status_code=404, detail="Summary image not found")
+    
+    image_data = paper.summary_image
+    if image_data.startswith(b"<svg") or b"<svg" in image_data[:100]:
+        media_type = "image/svg+xml"
+    else:
+        media_type = "image/jpeg"
+        
+    return Response(content=image_data, media_type=media_type)

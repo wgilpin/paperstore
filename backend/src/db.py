@@ -52,6 +52,7 @@ def create_tables() -> None:
     # Import models so Base.metadata includes them before create_all().
     import src.models.batch_job  # noqa: F401
     import src.models.paper_tag  # noqa: F401
+    import src.models.setting  # noqa: F401
     import src.models.tag  # noqa: F401
 
     engine = _get_engine()
@@ -155,4 +156,20 @@ def create_tables() -> None:
     """
     with engine.connect() as conn:
         conn.execute(text(_add_extracted_text_sql))
+        conn.commit()
+
+    # Add summary_text column to papers if it was created before this column existed.
+    _add_summary_text_sql = """
+    ALTER TABLE papers ADD COLUMN IF NOT EXISTS summary_text TEXT;
+    """
+    with engine.connect() as conn:
+        conn.execute(text(_add_summary_text_sql))
+        conn.commit()
+
+    # Add summary_image column to papers if it was created before this column existed.
+    _add_summary_image_sql = """
+    ALTER TABLE papers ADD COLUMN IF NOT EXISTS summary_image BYTEA;
+    """
+    with engine.connect() as conn:
+        conn.execute(text(_add_summary_image_sql))
         conn.commit()

@@ -75,6 +75,7 @@ function initPaperPage() {
     setupInlineTags(paper);
     setupEditForm(paper);
     setupExtractButton(paper);
+    setupSummary(paper);
   }
 
   function setupInlineTags(paper) {
@@ -353,6 +354,119 @@ function initPaperPage() {
     } catch {
       // Silently ignore save errors in prototype
     }
+  }
+
+  function setupSummary(paper) {
+    console.log("setupSummary initialized for paper:", paper.id);
+    const summaryBtn = document.getElementById('summary-btn');
+    const summaryRegenWrap = document.getElementById('summary-regen-wrap');
+    const summaryInstructions = document.getElementById('summary-instructions');
+    const regenSummaryBtn = document.getElementById('regen-summary-btn');
+    const summaryStatus = document.getElementById('summary-status');
+    const summaryCard = document.getElementById('summary-card');
+    const summaryText = document.getElementById('summary-text');
+    const summaryImageCard = document.getElementById('summary-image-card');
+    const summaryImage = document.getElementById('summary-image');
+
+    if (!summaryBtn) return;
+
+    // Load cached summary on page load
+    loadCachedSummary();
+
+    async function loadCachedSummary() {
+      summaryStatus.textContent = 'Loading summary cache...';
+      try {
+        const res = await fetch(`${API}/papers/${paper.id}/summary`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.summary_text) {
+            displaySummary(data.summary_text, data.has_image);
+            summaryStatus.textContent = '';
+            summaryBtn.textContent = 'Regenerate Summary';
+            summaryRegenWrap.style.display = 'flex';
+          } else {
+            summaryStatus.textContent = 'No summary generated yet.';
+            summaryBtn.textContent = 'Generate Summary';
+            summaryRegenWrap.style.display = 'none';
+          }
+        } else {
+          summaryStatus.textContent = 'Failed to check summary cache.';
+        }
+      } catch {
+        summaryStatus.textContent = 'Error loading summary cache.';
+      }
+    }
+
+    function displaySummary(text, hasImage) {
+      summaryCard.hidden = false;
+      summaryText.innerHTML = marked.parse(text);
+      
+      // Render LaTeX equations in the summary text container
+      if (window.renderMathInElement) {
+        window.renderMathInElement(summaryText, {
+          delimiters: [
+            {left: '$$', right: '$$', display: true},
+            {left: '$', right: '$', display: false},
+            {left: '\\(', right: '\\)', display: false},
+            {left: '\\[', right: '\\]', display: true}
+          ],
+          throwOnError: false
+        });
+      }
+
+      if (hasImage) {
+        summaryImage.src = `${API}/papers/${paper.id}/summary-image?t=${Date.now()}`;
+        summaryImageCard.hidden = false;
+      } else {
+        summaryImageCard.hidden = true;
+        summaryImage.src = '';
+      }
+    }
+
+    async function triggerGeneration(instructions = '') {
+      console.log("triggerGeneration called, instructions:", instructions);
+      summaryBtn.disabled = true;
+      regenSummaryBtn.disabled = true;
+      summaryStatus.textContent = 'Generating summary and visual... this may take up to a minute.';
+      summaryCard.hidden = true;
+      summaryImageCard.hidden = true;
+
+      try {
+        const body = instructions ? { instructions } : {};
+        const res = await fetch(`${API}/papers/${paper.id}/summary`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          displaySummary(data.summary_text, data.has_image);
+          summaryStatus.textContent = 'Summary generated successfully!';
+          summaryBtn.textContent = 'Regenerate Summary';
+          summaryRegenWrap.style.display = 'flex';
+          summaryInstructions.value = '';
+          setTimeout(() => { summaryStatus.textContent = ''; }, 3000);
+        } else {
+          const data = await res.json().catch(() => ({}));
+          summaryStatus.textContent = `Generation failed: ${data.detail || 'unknown error'}`;
+        }
+      } catch {
+        summaryStatus.textContent = 'Network error generating summary.';
+      } finally {
+        summaryBtn.disabled = false;
+        regenSummaryBtn.disabled = false;
+      }
+    }
+
+    summaryBtn.addEventListener('click', () => {
+      triggerGeneration();
+    });
+
+    regenSummaryBtn.addEventListener('click', () => {
+      const instructions = summaryInstructions.value.trim();
+      triggerGeneration(instructions);
+    });
   }
 }
 

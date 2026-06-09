@@ -33,14 +33,18 @@ class TestGetRecentLimit:
 
         get_recent(since=None, limit=5, db=db)
 
-        db.query.return_value.filter.return_value.order_by.return_value.limit.assert_called_once_with(5)
+        db.query.return_value.filter.return_value.order_by.return_value.limit.assert_called_once_with(
+            5
+        )
 
     def test_custom_limit_is_passed_to_query(self) -> None:
         db = _make_db([_mock_paper(str(i)) for i in range(3)])
 
         get_recent(since=None, limit=3, db=db)
 
-        db.query.return_value.filter.return_value.order_by.return_value.limit.assert_called_once_with(3)
+        db.query.return_value.filter.return_value.order_by.return_value.limit.assert_called_once_with(
+            3
+        )
 
     def test_results_are_mapped_to_recent_paper(self) -> None:
         paper = _mock_paper("My Paper")
@@ -59,5 +63,7 @@ class TestGetRecentLimit:
         get_recent(since=since, limit=5, db=db)
 
         # The second .filter() call (for `since`) should have been made
-        limit_chain = db.query.return_value.filter.return_value.order_by.return_value.limit.return_value
+        limit_chain = (
+            db.query.return_value.filter.return_value.order_by.return_value.limit.return_value
+        )
         limit_chain.filter.assert_called_once()
