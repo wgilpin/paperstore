@@ -246,6 +246,18 @@
     <!-- Tab 3: Summary Content -->
     <div id="tab-summary" class="tab-content" style="display: none;">
       <div id="summary-section" style="margin-bottom: 2rem;">
+        <div id="summary-card" hidden style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1.5rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 1.5rem;">
+          <!-- Whiteboard visual at the top of the Summary tab, as requested! -->
+          <div id="summary-image-card" hidden style="margin-bottom: 1.5rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 1.5rem; text-align: center;">
+            <h3 style="font-size: 1.05rem; font-weight: 600; color: #0f172a; margin-bottom: 0.75rem; text-align: left;">Whiteboard Visual</h3>
+            <img id="summary-image" src="" alt="Whiteboard explanation" style="max-width: 100%; height: auto; border-radius: 8px; border: 1px solid #cbd5e1; box-shadow: 0 2px 8px rgba(0,0,0,0.06);" />
+          </div>
+
+          <div id="summary-text" style="font-size: 0.95rem; line-height: 1.7; color: #334155;"></div>
+        </div>
+
+        <div id="summary-status" style="font-size: 0.85rem; color: #64748b; margin-bottom: 0.5rem; min-height: 1.2em;"></div>
+
         <div id="summary-actions" style="margin-bottom: 1rem; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;">
           <button id="summary-btn" class="icon-btn" style="padding: 0.5rem 1rem; font-weight: 600; background: #2563eb; color: #fff; border: none; border-radius: 6px;">
             Generate Summary
@@ -256,18 +268,6 @@
               Regenerate with Instructions
             </button>
           </div>
-        </div>
-        
-        <div id="summary-status" style="font-size: 0.85rem; color: #64748b; margin-bottom: 0.5rem; min-height: 1.2em;"></div>
-        
-        <div id="summary-card" hidden style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1.5rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
-          <!-- Whiteboard visual at the top of the Summary tab, as requested! -->
-          <div id="summary-image-card" hidden style="margin-bottom: 1.5rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 1.5rem; text-align: center;">
-            <h3 style="font-size: 1.05rem; font-weight: 600; color: #0f172a; margin-bottom: 0.75rem; text-align: left;">Whiteboard Visual</h3>
-            <img id="summary-image" src="" alt="Whiteboard explanation" style="max-width: 100%; height: auto; border-radius: 8px; border: 1px solid #cbd5e1; box-shadow: 0 2px 8px rgba(0,0,0,0.06);" />
-          </div>
-
-          <div id="summary-text" style="font-size: 0.95rem; line-height: 1.7; color: #334155;"></div>
         </div>
       </div>
     </div>
@@ -303,7 +303,7 @@
     <img id="overlay-img" src="" alt="Zoomed Visual" style="max-width: 90vw; max-height: 90vh; border-radius: 8px; box-shadow: 0 12px 40px rgba(0,0,0,0.5); transform: scale(0.95); transition: transform 0.2s ease-in-out; object-fit: contain;" />
   </div>
 
-  <script src="/static/utils.js?v=8"></script>
-  <script src="/static/paper.js?v=8"></script>
+  <script src="/static/utils.js?v=9"></script>
+  <script src="/static/paper.js?v=9"></script>
 </body>
 </html>

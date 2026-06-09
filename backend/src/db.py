@@ -173,3 +173,41 @@ def create_tables() -> None:
     with engine.connect() as conn:
         conn.execute(text(_add_summary_image_sql))
         conn.commit()
+
+
+# Automatically sanitize strings and collections of strings by stripping NUL (\x00) characters
+# to prevent PostgreSQL errors when inserting/updating papers with NUL bytes.
+
+from sqlalchemy import event, inspect
+from sqlalchemy.orm import Mapper
+
+
+def _has_nul(val) -> bool:
+    if isinstance(val, str):
+        return "\x00" in val
+    elif isinstance(val, list):
+        return any(_has_nul(x) for x in val)
+    elif isinstance(val, dict):
+        return any(_has_nul(k) or _has_nul(v) for k, v in val.items())
+    return False
+
+
+def _clean_value(val):
+    if isinstance(val, str):
+        return val.replace("\x00", "")
+    elif isinstance(val, list):
+        return [_clean_value(x) for x in val]
+    elif isinstance(val, dict):
+        return {k: _clean_value(v) for k, v in val.items()}
+    return val
+
+
+@event.listens_for(Mapper, "before_insert")
+@event.listens_for(Mapper, "before_update")
+def _sanitize_strings(mapper, connection, target) -> None:
+    state = inspect(target)
+    for attr in state.attrs:
+        value = attr.value
+        if value is not None and _has_nul(value):
+            setattr(target, attr.key, _clean_value(value))
+
