@@ -42,6 +42,8 @@ def _make_service(
     mock_pdf: MagicMock,
     mock_drive: MagicMock,
 ) -> IngestionService:
+    if isinstance(mock_drive.find_file.return_value, MagicMock):
+        mock_drive.find_file.return_value = None
     mock_arxiv = MagicMock()
     with (
         patch("src.services.ingestion.ArxivClient", return_value=mock_arxiv),

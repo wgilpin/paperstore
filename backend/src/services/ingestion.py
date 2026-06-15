@@ -92,10 +92,13 @@ class IngestionService:
                 paper_id=str(existing.id),
             )
         safe_title = "".join(c if c.isalnum() or c in " -_" else "_" for c in title).strip()
-        drive_result = self._drive.upload(
-            pdf_bytes,
-            filename=f"{safe_title}.pdf",
-        )
+        filename = f"{safe_title}.pdf"
+        drive_result = self._drive.find_file(filename)
+        if not drive_result:
+            drive_result = self._drive.upload(
+                pdf_bytes,
+                filename=filename,
+            )
         paper = Paper(
             title=title,
             authors=metadata.get("authors") or [],
@@ -148,7 +151,10 @@ class IngestionService:
             )
 
         safe_title = "".join(c if c.isalnum() or c in " -_" else "_" for c in title).strip()
-        drive_result = self._drive.upload(pdf_bytes, filename=f"{safe_title}.pdf")
+        filename = f"{safe_title}.pdf"
+        drive_result = self._drive.find_file(filename)
+        if not drive_result:
+            drive_result = self._drive.upload(pdf_bytes, filename=filename)
 
         paper = Paper(
             title=title,

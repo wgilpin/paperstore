@@ -76,6 +76,41 @@ class DriveService:
         except Exception as exc:
             raise DriveUploadError(str(exc)) from exc
 
+    def find_file(self, filename: str) -> DriveUploadResult | None:
+        """Find a file on Google Drive by *filename*.
+
+        Returns a DriveUploadResult with file_id and view_url if found,
+        otherwise None.
+        """
+        try:
+            service = self._get_service()
+            folder_id = os.environ.get("DRIVE_FOLDER_ID", "").strip()
+            # Escape single quotes in filename for query
+            escaped_filename = filename.replace("'", "\\'")
+            query = f"name = '{escaped_filename}' and trashed = false"
+            if folder_id:
+                query += f" and '{folder_id}' in parents"
+
+            results = (
+                service.files()
+                .list(
+                    q=query,
+                    fields="files(id, webViewLink)",
+                    spaces="drive",
+                    supportsAllDrives=True,
+                    includeItemsFromAllDrives=True,
+                )
+                .execute()
+            )
+            files = results.get("files", [])
+            if files:
+                file_id: str = files[0]["id"]
+                embed_url = f"https://drive.google.com/file/d/{file_id}/preview"
+                return DriveUploadResult(file_id=file_id, view_url=embed_url)
+            return None
+        except Exception as exc:
+            raise DriveUploadError(str(exc)) from exc
+
     def download(self, file_id: str) -> bytes:
         """Download *file_id* from Drive and return its raw bytes.
 

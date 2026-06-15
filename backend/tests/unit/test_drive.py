@@ -43,3 +43,51 @@ class TestDriveServiceUpload:
 
         with pytest.raises(DriveUploadError, match="quota exceeded"):
             svc.upload(b"%PDF fake", "paper.pdf")
+
+
+class TestDriveServiceFindFile:
+    def _make_service(self) -> tuple[DriveService, MagicMock]:
+        mock_drive = MagicMock()
+        with patch("src.services.drive.DriveService._get_service", return_value=mock_drive):
+            svc = DriveService()
+        svc._service = mock_drive
+        return svc, mock_drive
+
+    def test_finds_file_successfully(self) -> None:
+        svc, mock_drive = self._make_service()
+
+        mock_list = MagicMock()
+        mock_list.execute.return_value = {
+            "files": [
+                {
+                    "id": "file-abc-123",
+                    "webViewLink": "https://drive.google.com/file/d/file-abc-123/view",
+                }
+            ]
+        }
+        mock_drive.files.return_value.list.return_value = mock_list
+
+        result = svc.find_file("paper.pdf")
+
+        assert result is not None
+        assert result["file_id"] == "file-abc-123"
+        assert "preview" in result["view_url"]
+
+        # Verify correct listing parameters
+        mock_drive.files.return_value.list.assert_called_once()
+        kwargs = mock_drive.files.return_value.list.call_args[1]
+        assert "name = 'paper.pdf'" in kwargs["q"]
+
+    def test_returns_none_if_not_found(self) -> None:
+        svc, mock_drive = self._make_service()
+
+        mock_list = MagicMock()
+        mock_list.execute.return_value = {
+            "files": []
+        }
+        mock_drive.files.return_value.list.return_value = mock_list
+
+        result = svc.find_file("missing.pdf")
+
+        assert result is None
+
