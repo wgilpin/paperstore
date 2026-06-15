@@ -8,6 +8,7 @@ services:
     ports:
       - "8000:8000"
     environment:
+      DATABASE_URL: postgresql://paperstore:paperstore@host.docker.internal:5433/paperstore
       GOOGLE_REDIRECT_URI: http://localhost:8000/auth/callback
       GOOGLE_JS_ORIGIN: http://localhost:8000
       OAUTHLIB_INSECURE_TRANSPORT: "1"
