@@ -79,6 +79,10 @@ def _tag_names(paper: Paper) -> list[str]:
 
 
 def _to_paper_detail(paper: Paper, note: Note) -> PaperDetail:
+    import os
+
+    folder_id = os.environ.get("DRIVE_FOLDER_ID", "").strip()
+    drive_folder_url = f"https://drive.google.com/drive/folders/{folder_id}" if folder_id else None
     return PaperDetail(
         id=paper.id,
         arxiv_id=paper.arxiv_id,
@@ -88,10 +92,12 @@ def _to_paper_detail(paper: Paper, note: Note) -> PaperDetail:
         abstract=paper.abstract,
         submission_url=paper.submission_url,
         drive_view_url=paper.drive_view_url,
+        drive_folder_url=drive_folder_url,
         added_at=paper.added_at,
         note=NoteSchema(content=note.content, updated_at=note.updated_at),
         tags=_tag_names(paper),
     )
+
 
 
 @router.get("/receive-share", response_class=RedirectResponse)
@@ -376,6 +382,34 @@ def get_pdf(
     if paper is None:
         raise HTTPException(status_code=404, detail="Paper not found")
     return RedirectResponse(url=paper.drive_view_url, status_code=302)
+
+
+@router.get("/{paper_id}/download")
+def download_paper(
+    paper_id: str,
+    db: Session = Depends(get_session),
+) -> Response:
+    paper = db.query(Paper).filter(Paper.id == paper_id).first()
+    if paper is None:
+        raise HTTPException(status_code=404, detail="Paper not found")
+    try:
+        from src.services.drive import DriveService
+
+        pdf_bytes = DriveService().download(paper.drive_file_id)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Drive download failed: {exc}") from exc
+
+    safe_title = "".join(c if c.isalnum() or c in " -_" else "_" for c in paper.title).strip()
+    if not safe_title:
+        safe_title = "paper"
+    filename = f"{safe_title}.pdf"
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
 
 
 @router.get("/{paper_id}/summary", response_model=SummaryResponse)

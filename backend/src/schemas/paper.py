@@ -36,6 +36,7 @@ class PaperDetail(BaseModel):
     abstract: str | None
     submission_url: str
     drive_view_url: str
+    drive_folder_url: str | None = None
     added_at: datetime
     note: NoteSchema
     tags: list[str]

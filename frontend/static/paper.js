@@ -64,6 +64,22 @@ function initPaperPage() {
       btn.hidden = false;
     }
 
+    if (paper.drive_folder_url) {
+      const driveBtn = document.getElementById('drive-btn');
+      if (driveBtn) {
+        driveBtn.href = paper.drive_folder_url;
+        driveBtn.hidden = false;
+      }
+    }
+
+
+    const downloadBtn = document.getElementById('download-btn');
+    if (downloadBtn) {
+      downloadBtn.href = `${API}/papers/${paper.id}/download`;
+      downloadBtn.hidden = false;
+    }
+
+
     const noteField = document.getElementById('note-field');
     noteField.value = paper.note ? paper.note.content : '';
     noteField.addEventListener('blur', () => saveNote(paper.id, noteField.value));
