@@ -50,7 +50,10 @@ function initPaperPage() {
     document.getElementById('paper-date').textContent = dateParts.join(' · ');
     document.getElementById('paper-abstract').textContent = paper.abstract || '';
     const embedUrl = paper.drive_view_url.replace(/\/view(\?.*)?$/, '/preview');
-    document.getElementById('pdf-frame').src = embedUrl;
+    const pdfFrame = document.getElementById('pdf-frame');
+    if (pdfFrame) {
+      pdfFrame.dataset.src = embedUrl;
+    }
 
     if (paper.arxiv_id) {
       const btn = document.getElementById('alphaxiv-btn');
@@ -533,6 +536,12 @@ function initPaperPage() {
         const targetContent = document.getElementById(tabId);
         if (targetContent) {
           targetContent.style.display = 'block';
+          if (tabId === 'tab-paper') {
+            const pdfFrame = document.getElementById('pdf-frame');
+            if (pdfFrame && !pdfFrame.src && pdfFrame.dataset.src) {
+              pdfFrame.src = pdfFrame.dataset.src;
+            }
+          }
         }
       });
     });
