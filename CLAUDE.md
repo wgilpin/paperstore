@@ -18,6 +18,7 @@ Read it before planning or implementing any feature. Key rules:
 - No remote API calls in tests — mock all external dependencies; skip tests that require a live LLM
 - Keep code as simple as possible — this is a prototype, not a production system
 - Never add features without explicit user approval
+- Never git add, commit, or push changes unless explicitly asked to by the user
 - Strong typing everywhere: pydantic/TypedDict, no plain `dict` args/returns, no `Any`
 - All code must pass `mypy` and `ruff` before saving
 - PostgreSQL for storage; Docker Compose for the full dev environment

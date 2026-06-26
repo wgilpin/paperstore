@@ -94,9 +94,13 @@ class SummaryService:
         try:
             image_prompt = (
                 f"Take the following summary text:\n\n{summary_text}\n\n"
-                "now take the text from your reply and transform it into a "
-                "professor's whiteboard image: diagrams, arrows, boxes, and "
-                "captions explaining the core idea visually. Use colors as well."
+                "Transform this summary into a whiteboard diagram (with diagrams, "
+                "arrows, boxes, and captions explaining the core idea visually "
+                "with colorful marker colors). "
+                "The image must have a solid, clean, pure white background, with "
+                "no classroom or lab background. "
+                "The view must be a flat 2D perspective, front-facing, with no "
+                "fisheye lens effect, no camera tilt, and no borders or frames."
             )
             logger.info(
                 "Generating whiteboard image for paper %s using gemini-3.1-flash-image",
@@ -145,13 +149,17 @@ class SummaryService:
         """Fallback to generating a hand-drawn-style SVG diagram using the text model."""
         prompt = (
             f"Take the following summary text:\n\n{summary_text}\n\n"
-            "now take the text from your reply and transform it into a professor's whiteboard image: "
-            "diagrams, arrows, boxes, and captions explaining the core idea visually. Use colors as well.\n\n"
-            "Generate this whiteboard diagram as a clean, responsive, and visually appealing SVG. "
-            "Use a light whiteboard theme (with white/off-white background, and colored marker lines for "
-            "arrows, boxes, and text). Ensure all text labels are readable and properly positioned.\n"
-            "Return ONLY the raw SVG code. Do not wrap it in markdown code fences, do not write any explanation. "
-            "Start immediately with '<svg' and end with '</svg>'."
+            "now take the text from your reply and transform it into a professor's "
+            "whiteboard image: diagrams, arrows, boxes, and captions explaining "
+            "the core idea visually. Use colors as well.\n\n"
+            "Generate this whiteboard diagram as a clean, responsive, and "
+            "visually appealing SVG. Use a light whiteboard theme (with "
+            "white/off-white background, and colored marker lines for arrows, "
+            "boxes, and text). Ensure all text labels are readable and "
+            "properly positioned.\n"
+            "Return ONLY the raw SVG code. Do not wrap it in markdown code "
+            "fences, do not write any explanation. Start immediately with "
+            "'<svg' and end with '</svg>'."
         )
         try:
             logger.info("Generating fallback SVG diagram using text model %s", model_name)
