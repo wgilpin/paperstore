@@ -212,6 +212,22 @@ function isArxivHost(url) {
   } catch { return false; }
 }
 
+function isBiorxivHost(url) {
+  try {
+    const host = new URL(url).hostname;
+    return host === "biorxiv.org" || host.endsWith(".biorxiv.org");
+  } catch { return false; }
+}
+
+// Rewrite a bioRxiv abstract URL to its full-text PDF URL.
+function biorxivPdfUrl(url) {
+  try {
+    const u = new URL(url);
+    const path = u.pathname.replace(/\.(full(-text)?|full\.pdf|pdf)$/, "").replace(/\/$/, "");
+    return `https://www.biorxiv.org${path}.full.pdf`;
+  } catch { return url; }
+}
+
 function isPdfUrl(url) {
   try { return new URL(url).pathname.toLowerCase().endsWith(".pdf"); }
   catch { return false; }
@@ -289,7 +305,18 @@ async function submitArxiv(tabUrl) {
   }
 }
 
-async function submitPdf(tabUrl) {
+async function submitBiorxiv(tabUrl) {
+  // bioRxiv sits behind Cloudflare, which sometimes blocks the server. If the
+  // server cannot fetch the PDF, download it in the browser and upload it.
+  try {
+    return await submitArxiv(tabUrl);
+  } catch (err) {
+    console.warn("Server-side bioRxiv ingest failed, uploading the PDF from the browser:", err);
+    return await submitPdf(biorxivPdfUrl(tabUrl), tabUrl);
+  }
+}
+
+async function submitPdf(tabUrl, sourceUrl) {
   setStatus("submitting", "Downloading PDF\u2026");
   const pdfResp = await fetch(tabUrl, { credentials: "include" });
   if (!pdfResp.ok) throw new Error(`Could not fetch PDF (${pdfResp.status})`);
@@ -303,13 +330,13 @@ async function submitPdf(tabUrl) {
   if (header !== "%PDF") {
     console.warn("Downloaded file is not a PDF (header: " + header + "). Falling back to server-side ingestion.");
     setStatus("submitting", "Self-healing: Fetching PDF via server\u2026");
-    return await submitArxiv(tabUrl);
+    return await submitArxiv(sourceUrl || tabUrl);
   }
 
   setStatus("submitting", "Uploading to PaperStore\u2026 This may take a minute, please wait.");
   const form = new FormData();
   form.append("file", blob, filenameFromUrl(tabUrl));
-  form.append("source_url", tabUrl);
+  form.append("source_url", sourceUrl || tabUrl);
 
   const resp = await fetch(`${BACKEND}/papers/upload`, {
     method: "POST",
@@ -347,7 +374,7 @@ async function submitPdf(tabUrl) {
   // Check if paper is already saved in Paperstore
   let isSaved = false;
   let savedPaperId = null;
-  if (isArxivHost(url) || isPdfUrl(url)) {
+  if (isArxivHost(url) || isBiorxivHost(url) || isPdfUrl(url)) {
     try {
       const checkResp = await fetch(`${BACKEND}/papers/check?url=${encodeURIComponent(url)}`, { credentials: "include" });
       if (checkResp.ok) {
@@ -381,7 +408,7 @@ async function submitPdf(tabUrl) {
   }
 
   // Show paywall warning if we detect ScienceDirect or a general non-arXiv PDF
-  if (isScienceDirect(url) || (isPdfUrl(url) && !isArxivHost(url))) {
+  if (isScienceDirect(url) || (isPdfUrl(url) && !isArxivHost(url) && !isBiorxivHost(url))) {
     const warningEl = document.getElementById("paywallWarning");
     if (warningEl) warningEl.style.display = "block";
     
@@ -389,8 +416,9 @@ async function submitPdf(tabUrl) {
     addBtn.style.display = "none";
   }
 
-  if (isArxivHost(url)) {
-    setStatus("", "Ready to add this arXiv paper.");
+  if (isArxivHost(url) || isBiorxivHost(url)) {
+    const isBiorxiv = isBiorxivHost(url);
+    setStatus("", isBiorxiv ? "Ready to add this bioRxiv preprint." : "Ready to add this arXiv paper.");
     addBtn.disabled = false;
     showTagSection(null, []);
     addBtn.addEventListener("click", async () => {
@@ -401,7 +429,7 @@ async function submitPdf(tabUrl) {
       addBtn.disabled = true;
       setStatus("submitting", "Submitting to PaperStore\u2026 This may take a minute, please wait.");
       try {
-        const result = await submitArxiv(url);
+        const result = isBiorxiv ? await submitBiorxiv(url) : await submitArxiv(url);
         const status = result.status;
         const paperId = result.paperId;
 

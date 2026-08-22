@@ -3,8 +3,8 @@
 import os
 from collections.abc import Generator
 
-from sqlalchemy import Engine, create_engine, text
-from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+from sqlalchemy import Engine, create_engine, event, inspect, text
+from sqlalchemy.orm import DeclarativeBase, Mapper, Session, sessionmaker
 
 
 class Base(DeclarativeBase):
@@ -178,11 +178,8 @@ def create_tables() -> None:
 # Automatically sanitize strings and collections of strings by stripping NUL (\x00) characters
 # to prevent PostgreSQL errors when inserting/updating papers with NUL bytes.
 
-from sqlalchemy import event, inspect
-from sqlalchemy.orm import Mapper
 
-
-def _has_nul(val) -> bool:
+def _has_nul(val: object) -> bool:
     if isinstance(val, str):
         return "\x00" in val
     elif isinstance(val, list):
@@ -192,20 +189,22 @@ def _has_nul(val) -> bool:
     return False
 
 
-def _clean_value(val):
+def _clean_value(val: object) -> object:
     if isinstance(val, str):
         return val.replace("\x00", "")
     elif isinstance(val, list):
         return [_clean_value(x) for x in val]
     elif isinstance(val, dict):
-        return {k: _clean_value(v) for k, v in val.items()}
+        return {_clean_value(k): _clean_value(v) for k, v in val.items()}
     return val
 
 
 @event.listens_for(Mapper, "before_insert")
 @event.listens_for(Mapper, "before_update")
-def _sanitize_strings(mapper, connection, target) -> None:
+def _sanitize_strings(mapper: Mapper[object], connection: object, target: object) -> None:
     state = inspect(target)
+    if state is None:
+        return
     for attr in state.attrs:
         value = attr.value
         if value is not None and _has_nul(value):

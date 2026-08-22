@@ -135,8 +135,16 @@ def run(db_url: str, dry_run: bool) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--dry-run", action="store_true", help="Print what would be done without making changes")
-    parser.add_argument("--db-url", default=None, help="Database URL (overrides DATABASE_URL env var)")
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print what would be done without making changes",
+    )
+    parser.add_argument(
+        "--db-url",
+        default=None,
+        help="Database URL (overrides DATABASE_URL env var)",
+    )
     args = parser.parse_args()
 
     db_url = _get_db_url(args.db_url)

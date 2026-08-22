@@ -1,18 +1,20 @@
 """Unit tests for database string sanitization (NUL character stripping)."""
 
-from sqlalchemy import Column, Integer, String, create_engine
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy import Integer, String, create_engine
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
 from src.db import _clean_value, _has_nul
 
-Base = declarative_base()
+
+class Base(DeclarativeBase):
+    pass
 
 
 class DummyModel(Base):
     __tablename__ = "dummy_model"
-    id = Column(Integer, primary_key=True)
-    name = Column(String, nullable=True)
-    description = Column(String, nullable=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str | None] = mapped_column(String, nullable=True)
+    description: Mapped[str | None] = mapped_column(String, nullable=True)
 
 
 def test_has_nul_helper() -> None:

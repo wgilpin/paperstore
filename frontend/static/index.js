@@ -216,7 +216,7 @@ function initIndexPage() {
       const data = await res.json();
       if (res.ok) {
         addStatus.className = 'success';
-        const isDirectPdf = url.toLowerCase().endsWith('.pdf') && !url.includes('arxiv.org');
+        const isDirectPdf = url.toLowerCase().endsWith('.pdf') && !url.includes('arxiv.org') && !url.includes('alphaxiv.org');
         addStatus.textContent = isDirectPdf
           ? `Added! Extracting metadata in the background — refresh shortly for the final title.`
           : `Added: "${data.paper.title}"`;

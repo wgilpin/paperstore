@@ -46,7 +46,9 @@ def _make_session():  # type: ignore[return]
 def main() -> None:
     parser = argparse.ArgumentParser(description="Backfill extracted_text for existing papers.")
     parser.add_argument("--db-url", default="postgresql://paperstore:paperstore@db:5432/paperstore")
-    parser.add_argument("--dry-run", action="store_true", help="Print what would be updated without writing.")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Print what would be updated without writing."
+    )
     args = parser.parse_args()
 
     if args.dry_run:

@@ -6,6 +6,7 @@ import time
 from pathlib import Path
 from typing import Literal
 
+import httpx
 from fastapi import (
     APIRouter,
     Depends,
@@ -147,6 +148,12 @@ def submit_paper(
     except ArxivUnavailableError as exc:
         logger.exception("arXiv API unavailable during ingestion of %s", body.url)
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except httpx.HTTPStatusError as exc:
+        logger.warning("PDF download failed for %s: %s", body.url, exc)
+        detail = f"Could not download the PDF (HTTP {exc.response.status_code})."
+        if exc.response.status_code == 429:
+            detail += " The publisher is rate-limiting the server — try again later."
+        raise HTTPException(status_code=502, detail=detail) from exc
 
     if _is_eligible(paper):
         _enrich_paper_async(str(paper.id), paper.drive_file_id)
@@ -219,7 +226,9 @@ def check_paper(
 ) -> dict[str, object]:
     """Check if a paper is already saved by submission URL or arXiv ID."""
     from src.services.arxiv_client import extract_arxiv_id
-    from src.services.ingestion import _is_arxiv_url
+    from src.services.ingestion import _is_arxiv_url, normalize_url
+
+    url = normalize_url(url)
 
     # Check by submission URL
     paper = db.query(Paper).filter(Paper.submission_url == url).first()

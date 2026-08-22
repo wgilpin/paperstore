@@ -12,14 +12,19 @@
       "Bash(git diff*)",
       "Bash(git log*)",
       "Bash(git add*)",
-      "cd /c/Users/wgilp/projects/paperStore/backend",
       "mcp__context7__resolve-library-id",
       "mcp__context7__query-docs",
       "WebFetch(domain:google-auth-oauthlib.readthedocs.io)",
       "WebFetch(domain:developers.google.com)",
       "Bash(uv sync)",
       "Bash(grep)",
-      "WebFetch(domain:ai.google.dev)"
+      "WebFetch(domain:ai.google.dev)",
+      "mcp__Claude_in_Chrome__computer",
+      "mcp__Claude_in_Chrome__browser_batch",
+      "mcp__visualize__read_me",
+      "Bash(curl -s \"https://api.biorxiv.org/details/biorxiv/10.1101/2020.01.30.927871/na/json\" -w \"[%{http_code}]\")",
+      "Bash(curl -s -H \"User-Agent: paperstore/1.0 \\(mailto:wgilpin@gmail.com\\)\" \"https://api.crossref.org/works/10.1101/2020.01.30.927871\" -w \"[%{http_code}]\")",
+      "Bash(curl -s -H \"User-Agent: paperstore/1.0 \\(mailto:wgilpin@gmail.com\\)\" \"https://api.crossref.org/works/10.64898/2026.02.12.705387\" -w \"[%{http_code}]\")"
     ]
   }
 }

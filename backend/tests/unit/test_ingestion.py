@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from src.services.arxiv_client import ArxivUnavailableError
+from src.services.biorxiv_client import BiorxivUnavailableError
 from src.services.drive import DriveUploadError
 from src.services.ingestion import DuplicateError, IngestionService
 from src.services.types import DriveUploadResult, PaperMetadata
@@ -50,11 +51,13 @@ def _make_service(
     mock_arxiv: MagicMock,
     mock_pdf: MagicMock,
     mock_drive: MagicMock,
+    mock_biorxiv: MagicMock | None = None,
 ) -> IngestionService:
     if isinstance(mock_drive.find_file.return_value, MagicMock):
         mock_drive.find_file.return_value = None
     with (
         patch("src.services.ingestion.ArxivClient", return_value=mock_arxiv),
+        patch("src.services.ingestion.BiorxivClient", return_value=mock_biorxiv or MagicMock()),
         patch("src.services.ingestion.PdfParser", return_value=mock_pdf),
         patch("src.services.ingestion.DriveService", return_value=mock_drive),
     ):
@@ -76,6 +79,20 @@ class TestIngestionServiceIngest:
         mock_arxiv.fetch.assert_called_once()
         # PdfParser downloads the PDF bytes for arXiv papers too
         mock_pdf.download_and_extract.assert_called_once()
+
+    def test_detects_alphaxiv_url_and_delegates_to_arxiv_client(self) -> None:
+        mock_arxiv = MagicMock()
+        mock_arxiv.fetch.return_value = _paper_metadata(arxiv_id="2608.16753")
+        mock_pdf = MagicMock()
+        mock_pdf.download_and_extract.return_value = (_paper_metadata(), b"%PDF")
+        mock_drive = MagicMock()
+        mock_drive.upload.return_value = _drive_result()
+
+        svc = _make_service(mock_arxiv, mock_pdf, mock_drive)
+        svc.ingest("https://www.alphaxiv.org/abs/2608.16753v1", _make_db())
+
+        mock_arxiv.fetch.assert_called_once()
+        mock_pdf.download_and_extract.assert_called_once_with("https://arxiv.org/pdf/2608.16753")
 
     def test_detects_plain_pdf_url_and_delegates_to_pdf_parser(self) -> None:
         mock_arxiv = MagicMock()
@@ -171,3 +188,65 @@ class TestIngestionServiceIngest:
         assert paper.title == "Direct Fallback Title"
         assert paper.arxiv_id == "2606.99999"
         db.commit.assert_called_once()
+
+
+class TestIngestionServiceBiorxiv:
+    _URL = "https://www.biorxiv.org/content/10.64898/2026.02.12.705387v2?utm_source=chatgpt.com"
+    _CANONICAL = "https://www.biorxiv.org/content/10.64898/2026.02.12.705387v2"
+    _PDF_URL = "https://www.biorxiv.org/content/10.64898/2026.02.12.705387v2.full.pdf"
+
+    def test_delegates_to_biorxiv_client_and_stores_canonical_url(self) -> None:
+        mock_arxiv = MagicMock()
+        mock_biorxiv = MagicMock()
+        mock_biorxiv.fetch.return_value = _paper_metadata(title="Zebra Finch Playbacks")
+        mock_pdf = MagicMock()
+        mock_pdf.download_and_extract.return_value = (_paper_metadata(), b"%PDF")
+        mock_drive = MagicMock()
+        mock_drive.upload.return_value = _drive_result()
+
+        db = _make_db()
+        svc = _make_service(mock_arxiv, mock_pdf, mock_drive, mock_biorxiv)
+        svc.ingest(self._URL, db)
+
+        mock_biorxiv.fetch.assert_called_once_with("10.64898/2026.02.12.705387")
+        mock_pdf.download_and_extract.assert_called_once_with(self._PDF_URL)
+        mock_arxiv.fetch.assert_not_called()
+
+        paper = db.add.call_args_list[0][0][0]
+        assert paper.submission_url == self._CANONICAL
+        assert paper.title == "Zebra Finch Playbacks"
+        assert paper.arxiv_id is None
+
+    def test_falls_back_to_pdf_metadata_when_crossref_unavailable(self) -> None:
+        mock_arxiv = MagicMock()
+        mock_biorxiv = MagicMock()
+        mock_biorxiv.fetch.side_effect = BiorxivUnavailableError("crossref down")
+        mock_pdf = MagicMock()
+        mock_pdf.download_and_extract.return_value = (
+            _paper_metadata(title="PDF Fallback Title"),
+            b"%PDF",
+        )
+        mock_drive = MagicMock()
+        mock_drive.upload.return_value = _drive_result()
+
+        db = _make_db()
+        svc = _make_service(mock_arxiv, mock_pdf, mock_drive, mock_biorxiv)
+        svc.ingest(self._URL, db)
+
+        mock_pdf.download_and_extract.assert_called_once_with(self._PDF_URL)
+        paper = db.add.call_args_list[0][0][0]
+        assert paper.title == "PDF Fallback Title"
+
+    def test_duplicate_detected_across_tracking_parameters(self) -> None:
+        mock_arxiv = MagicMock()
+        mock_biorxiv = MagicMock()
+        mock_pdf = MagicMock()
+        mock_drive = MagicMock()
+
+        db = _make_db(first_results=[MagicMock()])
+        svc = _make_service(mock_arxiv, mock_pdf, mock_drive, mock_biorxiv)
+        with pytest.raises(DuplicateError):
+            svc.ingest(self._URL, db)
+
+        filter_arg = db.query.return_value.filter.call_args[0][0]
+        assert self._CANONICAL in str(filter_arg.compile(compile_kwargs={"literal_binds": True}))

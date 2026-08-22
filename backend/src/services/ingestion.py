@@ -13,12 +13,20 @@ from src.services.arxiv_client import (
     ArxivUnavailableError,
     extract_arxiv_id,
 )
+from src.services.biorxiv_client import (
+    BiorxivClient,
+    BiorxivUnavailableError,
+    biorxiv_pdf_url,
+    canonical_biorxiv_url,
+    is_biorxiv_url,
+    parse_biorxiv_url,
+)
 from src.services.drive import DriveService
 from src.services.pdf_parser import PdfParser
 
 logger = logging.getLogger(__name__)
 
-_ARXIV_HOSTNAMES = {"arxiv.org", "ar5iv.labs.arxiv.org"}
+_ARXIV_HOSTNAMES = {"arxiv.org", "ar5iv.labs.arxiv.org", "alphaxiv.org"}
 
 
 class DuplicateError(Exception):
@@ -32,14 +40,34 @@ class DuplicateError(Exception):
 def _is_arxiv_url(url: str) -> bool:
     try:
         hostname = urlparse(url).hostname or ""
-        return hostname in _ARXIV_HOSTNAMES or hostname.endswith(".arxiv.org")
+        return (
+            hostname in _ARXIV_HOSTNAMES
+            or hostname.endswith(".arxiv.org")
+            or hostname.endswith(".alphaxiv.org")
+        )
     except Exception:
         return False
+
+
+def normalize_url(url: str) -> str:
+    """Return a canonical form of *url* for storage and duplicate checks.
+
+    bioRxiv URLs carry tracking parameters, so they are reduced to the
+    canonical abstract-page form. All other URLs are returned unchanged.
+    """
+    if is_biorxiv_url(url):
+        try:
+            doi, version = parse_biorxiv_url(url)
+        except ValueError:
+            return url
+        return canonical_biorxiv_url(doi, version)
+    return url
 
 
 class IngestionService:
     def __init__(self) -> None:
         self._arxiv = ArxivClient()
+        self._biorxiv = BiorxivClient()
         self._pdf = PdfParser()
         self._drive = DriveService()
 
@@ -50,6 +78,8 @@ class IngestionService:
         Raises DuplicateError if the paper already exists.
         Raises DriveUploadError if the Drive upload fails (no partial record created).
         """
+        url = normalize_url(url)
+
         # Duplicate check by submission URL.
         existing = db.query(Paper).filter(Paper.submission_url == url).first()
         if existing:
@@ -80,6 +110,19 @@ class IngestionService:
                 pdf_url = f"https://arxiv.org/pdf/{arxiv_id}"
                 metadata, pdf_bytes = self._pdf.download_and_extract(pdf_url)
                 metadata["arxiv_id"] = arxiv_id
+        elif is_biorxiv_url(url):
+            doi, version = parse_biorxiv_url(url)
+            pdf_url = biorxiv_pdf_url(doi, version)
+            try:
+                metadata = self._biorxiv.fetch(doi)
+                _, pdf_bytes = self._pdf.download_and_extract(pdf_url)
+            except BiorxivUnavailableError as exc:
+                logger.warning(
+                    "Crossref lookup failed for %s, falling back to the PDF itself: %s",
+                    doi,
+                    exc,
+                )
+                metadata, pdf_bytes = self._pdf.download_and_extract(pdf_url)
         else:
             metadata, pdf_bytes = self._pdf.download_and_extract(url)
 
@@ -132,7 +175,7 @@ class IngestionService:
         Raises DuplicateError if the paper already exists (by path or title).
         Raises DriveUploadError if the Drive upload fails (no partial record created).
         """
-        submission_url = source_url if source_url else local_path.resolve().as_uri()
+        submission_url = normalize_url(source_url) if source_url else local_path.resolve().as_uri()
 
         existing = db.query(Paper).filter(Paper.submission_url == submission_url).first()
         if existing:
