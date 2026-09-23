@@ -31,7 +31,7 @@ Updated: 2026-09-23
   - [x] epic-05-parse-again — merged 2026-09-23
 - [ ] 02-find-and-import — in progress
   - [x] epic-01-library-match — reviewed 2026-09-23
-  - [ ] epic-02-outside-lookup — pending
+  - [x] epic-02-outside-lookup — reviewed 2026-09-23
   - [ ] epic-03-background-import — pending
 - [ ] 03-manual-paths — pending
 - [ ] 04-mvp-test — pending

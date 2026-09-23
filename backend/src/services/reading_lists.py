@@ -1,14 +1,29 @@
 """Reading list service — create, read and change reading lists and their items."""
 
+import logging
+import threading
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 
 from src.models.reading_list import ReadingList, ReadingListItem
-from src.schemas.reading_list import Candidate, ListProgress, ListSummary, ParsedItem
+from src.schemas.reading_list import (
+    Candidate,
+    ListProgress,
+    ListSummary,
+    LookupStatus,
+    ParsedItem,
+)
 from src.services.citation_resolver import CitationResolver
 from src.services.notes import NotFoundError
+
+logger = logging.getLogger(__name__)
+
+# Lists whose lookup thread is running. In memory, like the batch metadata loop:
+# a restart ends the thread, the items stay "new", and "Find papers" starts again.
+_running_lookups: set[uuid.UUID] = set()
+_lookup_lock = threading.Lock()
 
 
 class ReadingListService:
@@ -66,10 +81,15 @@ class ReadingListService:
         items = reading_list.items
         return ListProgress(read=sum(1 for i in items if i.is_read), total=len(items))
 
-    def find_papers(self, list_id: uuid.UUID, db: Session) -> ReadingList:
-        """Look up every item that is not linked yet and hold the results for review."""
+    def lookup_list(
+        self, list_id: uuid.UUID, db: Session, resolver: CitationResolver | None = None
+    ) -> None:
+        """Look up every item not linked or looked up yet, holding the results for review.
+
+        Commits after each item, so the list page can show progress.
+        """
+        resolver = resolver or CitationResolver()
         reading_list = self.get_list(list_id, db)
-        resolver = CitationResolver()
         for item in reading_list.items:
             if item.paper_id is not None or item.status != "new":
                 continue
@@ -77,8 +97,17 @@ class ReadingListService:
             item.candidate = candidate
             item.outcome = candidate.outcome if candidate else "not_found"
             item.status = "review"
-        db.commit()
-        return reading_list
+            db.commit()
+
+    def lookup_status(self, reading_list: ReadingList) -> LookupStatus:
+        """How far the list's lookup has got, and what is left to do."""
+        review = len(self.review_items(reading_list))
+        return LookupStatus(
+            running=lookup_running(reading_list.id),
+            looked_up=review,
+            unlooked=sum(1 for i in reading_list.items if i.status == "new" and i.paper_id is None),
+            pending_review=review,
+        )
 
     def review_items(self, reading_list: ReadingList) -> list[ReadingListItem]:
         """The items of *reading_list* waiting for review, in list order."""
@@ -153,3 +182,40 @@ def _accept(item: ReadingListItem, candidate: Candidate) -> None:
     """Apply an accepted match to *item*."""
     if candidate.outcome == "in_library" and candidate.paper_id is not None:
         item.paper_id = candidate.paper_id
+    elif candidate.outcome == "record_only":
+        item.url = candidate.landing_url or (
+            f"https://doi.org/{candidate.doi}" if candidate.doi else None
+        )
+    elif candidate.outcome == "free_pdf":
+        # Until the importer exists, an accepted free PDF becomes a link to it.
+        item.url = candidate.landing_url or candidate.pdf_url
+
+
+def start_lookup(list_id: uuid.UUID) -> None:
+    """Start the background lookup for a list; no-op if one is already running."""
+    with _lookup_lock:
+        if list_id in _running_lookups:
+            return
+        _running_lookups.add(list_id)
+    threading.Thread(target=_lookup_thread, args=(list_id,), daemon=True).start()
+
+
+def lookup_running(list_id: uuid.UUID) -> bool:
+    """True while a lookup thread runs for the list."""
+    with _lookup_lock:
+        return list_id in _running_lookups
+
+
+def _lookup_thread(list_id: uuid.UUID) -> None:
+    """Run one list's lookup in its own session."""
+    from src.db import _get_engine
+
+    db = sessionmaker(bind=_get_engine(), autocommit=False, autoflush=False)()
+    try:
+        ReadingListService().lookup_list(list_id, db)
+    except Exception:
+        logger.exception("lookup failed for reading list %s", list_id)
+    finally:
+        db.close()
+        with _lookup_lock:
+            _running_lookups.discard(list_id)

@@ -1,0 +1,14 @@
+{# Lookup controls for a list page. While a lookup runs, this block polls itself. #}
+<div class="actions" id="lookup-status"
+     {% if status.running %}hx-get="/lists/{{ list_id }}/lookup-status" hx-trigger="every 2s" hx-swap="outerHTML"{% endif %}>
+  {% if status.running %}
+  <span class="subtle">Looking up papers… {{ status.looked_up }} of {{ status.looked_up + status.unlooked }}</span>
+  {% elif status.pending_review %}
+  <a class="btn" href="/lists/{{ list_id }}/review">Review matches ({{ status.pending_review }})</a>
+  {% elif status.unlooked %}
+  <form method="post" action="/lists/{{ list_id }}/find"
+        hx-post="/lists/{{ list_id }}/find" hx-disabled-elt="find button">
+    <button class="btn btn-plain" type="submit">Find papers ({{ status.unlooked }})</button>
+  </form>
+  {% endif %}
+</div>

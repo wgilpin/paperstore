@@ -326,3 +326,73 @@ class TestPaperItems:
         progress = ReadingListService().progress(reading_list)
 
         assert (progress.read, progress.total) == (1, 2)
+
+
+class _FakeResolver:
+    """Stands in for CitationResolver: returns a fixed candidate per title."""
+
+    def __init__(self, by_title: dict[str, Candidate | None]) -> None:
+        self.by_title = by_title
+        self.seen: list[str] = []
+
+    def resolve(self, query: ParsedItem, db: object) -> Candidate | None:
+        self.seen.append(query.title)
+        return self.by_title.get(query.title)
+
+
+class TestLookup:
+    def test_run_lookup_stores_candidates_for_unlinked_items(self) -> None:
+        list_id = uuid.uuid4()
+        found, missing = _stored_item(list_id), _stored_item(list_id)
+        found.title, missing.title = "Found", "Missing"
+        found.status = missing.status = "new"
+        reading_list = ReadingList(id=list_id, name="L", raw_text="raw", items=[found, missing])
+        db = MagicMock()
+        db.get.return_value = reading_list
+        candidate = _library_candidate(uuid.uuid4())
+
+        ReadingListService().lookup_list(
+            list_id, db, _FakeResolver({"Found": candidate, "Missing": None})
+        )
+
+        assert (found.status, found.outcome, found.candidate) == ("review", "in_library", candidate)
+        assert (missing.status, missing.outcome, missing.candidate) == ("review", "not_found", None)
+
+    def test_run_lookup_skips_linked_items(self) -> None:
+        list_id = uuid.uuid4()
+        linked = _stored_item(list_id)
+        linked.title, linked.status, linked.paper_id = "Linked", "done", uuid.uuid4()
+        reading_list = ReadingList(id=list_id, name="L", raw_text="raw", items=[linked])
+        db = MagicMock()
+        db.get.return_value = reading_list
+        resolver = _FakeResolver({})
+
+        ReadingListService().lookup_list(list_id, db, resolver)
+
+        assert resolver.seen == []
+        assert linked.status == "done"
+
+
+class TestApplyReviewOutside:
+    def test_accept_record_only_sets_doi_link(self) -> None:
+        list_id = uuid.uuid4()
+        candidate = Candidate(
+            source="openalex",
+            title="Computational principles of synaptic memory consolidation",
+            authors=["Benna"],
+            year=2016,
+            doi="10.1038/nn.4401",
+            landing_url="https://doi.org/10.1038/nn.4401",
+            confident=True,
+            outcome="record_only",
+        )
+        item = _review_item(list_id, candidate, "record_only")
+        reading_list = ReadingList(id=list_id, name="Memory", raw_text="raw", items=[item])
+        db = MagicMock()
+        db.get.return_value = reading_list
+
+        ReadingListService().apply_review(list_id, {item.id}, db)
+
+        assert item.url == "https://doi.org/10.1038/nn.4401"
+        assert item.paper_id is None
+        assert item.status == "done"
