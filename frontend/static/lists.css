@@ -47,3 +47,5 @@ a.btn:hover { text-decoration: none; }
 .badge-in_library, .badge-free_pdf { background: #dcfce7; color: #166534; }
 .badge-record_only { background: #e0f2fe; color: #075985; }
 .badge-weak { background: #fef3c7; color: #92400e; }
+.badge-importing { background: #e0e7ff; color: #3730a3; margin-top: 0.35rem; }
+.badge-failed { background: #fee2e2; color: #991b1b; margin-top: 0.35rem; }

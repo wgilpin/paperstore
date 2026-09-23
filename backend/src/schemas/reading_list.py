@@ -37,6 +37,8 @@ class LookupStatus(BaseModel):
     """Lookup progress for one list, for the list page's controls."""
 
     running: bool
+    # Items whose import is in progress.
+    importing: int
     looked_up: int
     unlooked: int
     pending_review: int

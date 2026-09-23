@@ -15,7 +15,8 @@ from src.schemas.reading_list import (
     LookupStatus,
     ParsedItem,
 )
-from src.services.citation_resolver import CitationResolver
+from src.services.citation_resolver import CitationResolver, library_by_doi
+from src.services.ingestion import DuplicateError, IngestionService
 from src.services.notes import NotFoundError
 
 logger = logging.getLogger(__name__)
@@ -104,6 +105,7 @@ class ReadingListService:
         review = len(self.review_items(reading_list))
         return LookupStatus(
             running=lookup_running(reading_list.id),
+            importing=sum(1 for i in reading_list.items if i.status == "importing"),
             looked_up=review,
             unlooked=sum(1 for i in reading_list.items if i.status == "new" and i.paper_id is None),
             pending_review=review,
@@ -113,16 +115,80 @@ class ReadingListService:
         """The items of *reading_list* waiting for review, in list order."""
         return [i for i in reading_list.items if i.status == "review"]
 
-    def apply_review(self, list_id: uuid.UUID, accepted: set[uuid.UUID], db: Session) -> None:
-        """Apply the review: link accepted matches; every reviewed item leaves review."""
+    def apply_review(
+        self, list_id: uuid.UUID, accepted: set[uuid.UUID], db: Session
+    ) -> list[uuid.UUID]:
+        """Apply the review; return the IDs of accepted free-PDF items, now to import.
+
+        Every reviewed item leaves review. An accepted free PDF keeps its candidate
+        for the importer; any other item is finished here.
+        """
         reading_list = self.get_list(list_id, db)
+        to_import: list[uuid.UUID] = []
         for item in self.review_items(reading_list):
             candidate = item.candidate
             if item.id in accepted and candidate is not None:
+                if candidate.outcome == "free_pdf":
+                    item.status = "importing"
+                    to_import.append(item.id)
+                    continue
                 _accept(item, candidate)
             item.candidate = None
             item.status = "done"
         db.commit()
+        return to_import
+
+    def import_item(
+        self, item_id: uuid.UUID, db: Session, ingestion: IngestionService | None = None
+    ) -> None:
+        """Import one accepted free-PDF item through the existing ingestion, and link it.
+
+        A duplicate links the existing paper. Any other failure marks the item
+        import_failed and keeps a link to the paper, and its candidate for a retry.
+        """
+        item = db.get(ReadingListItem, item_id)
+        if item is None or item.status != "importing":
+            return
+        candidate = item.candidate
+        if candidate is None or not (candidate.arxiv_id or candidate.pdf_url):
+            _mark_import_failed(item)
+            db.commit()
+            return
+        url = (
+            f"https://arxiv.org/abs/{candidate.arxiv_id}"
+            if candidate.arxiv_id
+            else candidate.pdf_url or ""
+        )
+        try:
+            paper = (ingestion or IngestionService()).ingest(url, db)
+        except DuplicateError as exc:
+            db.rollback()
+            if exc.paper_id:
+                item.paper_id = uuid.UUID(exc.paper_id)
+                item.candidate = None
+                item.status = "done"
+            else:
+                _mark_import_failed(item)
+        except Exception:
+            db.rollback()
+            logger.exception("import failed for reading list item %s (%s)", item_id, url)
+            _mark_import_failed(item)
+        else:
+            item.paper_id = paper.id
+            # Keep the lookup's DOI as a dedupe key, unless another paper has it.
+            if candidate.doi and paper.doi is None and library_by_doi(candidate.doi, db) is None:
+                paper.doi = candidate.doi
+            item.candidate = None
+            item.status = "done"
+        db.commit()
+
+    def reset_stuck_imports(self, db: Session) -> int:
+        """Mark items left importing by a restart as import_failed; return how many."""
+        stuck = db.query(ReadingListItem).filter(ReadingListItem.status == "importing").all()
+        for item in stuck:
+            _mark_import_failed(item)
+        db.commit()
+        return len(stuck)
 
     def list_summaries(self, db: Session) -> list[ListSummary]:
         """Return every list with its progress, newest first."""
@@ -186,9 +252,35 @@ def _accept(item: ReadingListItem, candidate: Candidate) -> None:
         item.url = candidate.landing_url or (
             f"https://doi.org/{candidate.doi}" if candidate.doi else None
         )
-    elif candidate.outcome == "free_pdf":
-        # Until the importer exists, an accepted free PDF becomes a link to it.
+
+
+def _mark_import_failed(item: ReadingListItem) -> None:
+    """Set import_failed and keep a link to the paper (the candidate stays for a retry)."""
+    candidate = item.candidate
+    item.status = "import_failed"
+    if candidate is not None:
         item.url = candidate.landing_url or candidate.pdf_url
+
+
+def start_import(item_ids: list[uuid.UUID]) -> None:
+    """Import accepted free-PDF items in a background thread, one after another."""
+    if item_ids:
+        threading.Thread(target=_import_thread, args=(item_ids,), daemon=True).start()
+
+
+def _import_thread(item_ids: list[uuid.UUID]) -> None:
+    """Run the imports in their own session."""
+    from src.db import _get_engine
+
+    db = sessionmaker(bind=_get_engine(), autocommit=False, autoflush=False)()
+    ingestion = IngestionService()
+    try:
+        for item_id in item_ids:
+            ReadingListService().import_item(item_id, db, ingestion)
+    except Exception:
+        logger.exception("import thread failed")
+    finally:
+        db.close()
 
 
 def start_lookup(list_id: uuid.UUID) -> None:

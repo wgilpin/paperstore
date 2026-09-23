@@ -135,10 +135,13 @@ def startup() -> None:
     create_tables()
     from src.db import get_session
     from src.services.batch_metadata import resume_submitted_chunks
+    from src.services.reading_lists import ReadingListService
 
     db = next(get_session())
     try:
         resume_submitted_chunks(db)
+        # Imports do not survive a restart; show them as failed so they can be retried.
+        ReadingListService().reset_stuck_imports(db)
     finally:
         db.close()
 
