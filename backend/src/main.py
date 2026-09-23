@@ -109,6 +109,7 @@ class NoCacheMiddleware(BaseHTTPMiddleware):
             path.startswith("/api")
             or path.startswith("/papers")
             or path.startswith("/tags")
+            or path.startswith("/lists")
         ):
             response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
             response.headers["Pragma"] = "no-cache"
@@ -197,11 +198,21 @@ async def _global_exception_handler(request: Request, exc: Exception) -> JSONRes
 
 
 # Import and register routers after app is defined to avoid circular imports.
-from src.api import auth, batch, papers, recent, search_api, settings, tags  # noqa: E402
+from src.api import (  # noqa: E402
+    auth,
+    batch,
+    papers,
+    reading_lists,
+    recent,
+    search_api,
+    settings,
+    tags,
+)
 
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(papers.router, prefix="/papers", tags=["papers"])
 app.include_router(tags.router, prefix="/tags", tags=["tags"])
+app.include_router(reading_lists.router, prefix="/lists", tags=["lists"])
 app.include_router(batch.router, prefix="/batch", tags=["batch"])
 app.include_router(settings.router, prefix="/api", tags=["settings"])
 app.include_router(recent.router, prefix="/api", tags=["api"])

@@ -24,8 +24,8 @@ Updated: 2026-09-23
 ## Phases
 
 - [ ] 01-paste-and-tick — in progress
-  - [x] epic-01-safe-database — reviewed 2026-09-23
-  - [ ] epic-02-paste-to-list — pending
+  - [x] epic-01-safe-database — merged 2026-09-23
+  - [x] epic-02-paste-to-list — reviewed 2026-09-23
   - [ ] epic-03-tick-items — pending
   - [ ] epic-04-manage-lists — pending
   - [ ] epic-05-parse-again — pending

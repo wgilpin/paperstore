@@ -52,6 +52,7 @@ def create_tables() -> None:
     # Import models so Base.metadata includes them before create_all().
     import src.models.batch_job  # noqa: F401
     import src.models.paper_tag  # noqa: F401
+    import src.models.reading_list  # noqa: F401
     import src.models.setting  # noqa: F401
     import src.models.tag  # noqa: F401
 
@@ -209,4 +210,3 @@ def _sanitize_strings(mapper: Mapper[object], connection: object, target: object
         value = attr.value
         if value is not None and _has_nul(value):
             setattr(target, attr.key, _clean_value(value))
-
