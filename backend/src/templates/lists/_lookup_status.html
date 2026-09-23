@@ -1,5 +1,5 @@
 {# Lookup controls for a list page. While a lookup or an import runs, this block polls itself. #}
-<div class="actions" id="lookup-status"
+<div class="actions" id="lookup-status"{% if oob %} hx-swap-oob="true"{% endif %}
      {% if status.running or status.importing %}hx-get="/lists/{{ list_id }}/lookup-status" hx-trigger="every 2s" hx-swap="outerHTML"{% endif %}>
   {% if status.running %}
   <span class="subtle">Looking up papers… {{ status.looked_up }} of {{ status.looked_up + status.unlooked }}</span>

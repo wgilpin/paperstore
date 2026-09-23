@@ -51,7 +51,8 @@ Outcome = Literal["in_library", "free_pdf", "record_only", "not_found"]
 class Candidate(BaseModel):
     """The best match a lookup found for one list item."""
 
-    source: Literal["library", "arxiv", "openalex"]
+    # "manual" when Will gave the URL himself.
+    source: Literal["library", "arxiv", "openalex", "manual"]
     title: str
     authors: list[str]
     year: int | None

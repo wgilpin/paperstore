@@ -34,8 +34,8 @@ Updated: 2026-09-23
   - [x] epic-02-outside-lookup — reviewed 2026-09-23
   - [x] epic-03-background-import — merged 2026-09-23
 - [ ] 03-manual-paths — in progress
-  - [x] epic-01-upload-pdf — reviewed 2026-09-23
-  - [ ] epic-02-add-link — pending
+  - [x] epic-01-upload-pdf — merged 2026-09-23
+  - [x] epic-02-add-link — reviewed 2026-09-23
   - [ ] epic-03-item-actions — pending
   - [ ] epic-04-read-filter — pending
 - [ ] 04-mvp-test — pending
