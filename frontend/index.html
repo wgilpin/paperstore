@@ -59,7 +59,7 @@
     #add-status.success { color: #16a34a; }
     .list-controls { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; }
     #paper-count { font-size: 0.85rem; color: #666; flex: 1; }
-    #sort-select { font-size: 0.85rem; padding: 0.25rem 0.5rem; border: 1px solid #ccc; border-radius: 4px; color: #444; }
+    #sort-select, #read-select { font-size: 0.85rem; padding: 0.25rem 0.5rem; border: 1px solid #ccc; border-radius: 4px; color: #444; }
     .paper-list { list-style: none; display: flex; flex-direction: column; gap: 0.75rem; }
     .paper-item { padding: 1rem 1.25rem; background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.08), 0 2px 10px rgba(0,0,0,0.05); cursor: pointer; border: none; }
     .paper-item:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.12), 0 4px 16px rgba(0,0,0,0.08); }
@@ -165,6 +165,12 @@
       <option value="title">Title</option>
       <option value="published_date">Date Published</option>
     </select>
+    <label for="read-select" style="font-size:0.85rem;color:#666;">Show:</label>
+    <select id="read-select">
+      <option value="">All</option>
+      <option value="unread">Unread</option>
+      <option value="read">Read</option>
+    </select>
   </div>
 
   <div class="tag-filter" id="tag-filter" hidden>
@@ -184,7 +190,7 @@
   </div>
 
   <script src="/static/utils.js?v=4"></script>
-  <script src="/static/index.js?v=4"></script>
+  <script src="/static/index.js?v=5"></script>
   <script>
     const hamburgerBtn = document.getElementById('hamburger-btn');
     const hamburgerMenu = document.getElementById('hamburger-menu');

@@ -201,9 +201,10 @@ def list_papers(
     sort: Literal["added_at", "title", "published_date"] = Query(default="added_at"),
     page: int = Query(default=1, ge=1),
     tag: str | None = Query(default=None),
+    read: Literal["read", "unread"] | None = Query(default=None),
     db: Session = Depends(get_session),
 ) -> dict[str, list[PaperSummary] | int]:
-    papers, total = SearchService().search(q, db, sort=sort, page=page, tag=tag)
+    papers, total = SearchService().search(q, db, sort=sort, page=page, tag=tag, read=read)
     summaries = [
         PaperSummary(
             id=p.id,

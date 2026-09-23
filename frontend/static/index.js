@@ -11,6 +11,7 @@ function initIndexPage() {
   const fileInput = document.getElementById('file-input');
   const searchInput = document.getElementById('search-input');
   const sortSelect = document.getElementById('sort-select');
+  const readSelect = document.getElementById('read-select');
   const paperList = document.getElementById('paper-list');
   const paperCount = document.getElementById('paper-count');
   const pagination = document.getElementById('pagination');
@@ -43,6 +44,7 @@ function initIndexPage() {
   if (initParams.get('page')) currentPage = Math.max(1, parseInt(initParams.get('page'), 10) || 1);
   if (initParams.get('q')) searchInput.value = initParams.get('q');
   if (initParams.get('sort')) sortSelect.value = initParams.get('sort');
+  if (initParams.get('read')) readSelect.value = initParams.get('read');
   if (initParams.get('tag')) activeTag = initParams.get('tag');
 
   const addUrl = initParams.get('add_url');
@@ -303,6 +305,12 @@ function initIndexPage() {
     loadPapers();
   });
 
+  // Read filter — reset to page 1
+  readSelect.addEventListener('change', () => {
+    currentPage = 1;
+    loadPapers();
+  });
+
   prevBtn.addEventListener('click', () => {
     if (currentPage > 1) { currentPage--; loadPapers(); }
   });
@@ -319,6 +327,7 @@ function initIndexPage() {
     if (query) p.set('q', query);
     if (sort && sort !== sortSelect.options[0].value) p.set('sort', sort);
     if (activeTag) p.set('tag', activeTag);
+    if (readSelect.value) p.set('read', readSelect.value);
     const qs = p.toString();
     history.replaceState(null, '', qs ? `?${qs}` : location.pathname);
   }
@@ -330,6 +339,7 @@ function initIndexPage() {
     const params = new URLSearchParams({ sort, page: String(currentPage) });
     if (query) params.set('q', query);
     if (activeTag) params.set('tag', activeTag);
+    if (readSelect.value) params.set('read', readSelect.value);
 
     try {
       const res = await fetch(`${API}/papers?${params}`);

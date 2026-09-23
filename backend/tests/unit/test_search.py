@@ -2,7 +2,7 @@
 
 from unittest.mock import MagicMock
 
-from src.services.search import SearchService
+from src.services.search import SearchService, read_filter
 
 
 def _mock_paper(title: str = "Paper") -> MagicMock:
@@ -75,3 +75,29 @@ class TestSearchServiceSearch:
         assert result_papers == papers
         assert total == len(papers)
         db.query.return_value.filter.assert_called()
+
+
+class TestReadFilter:
+    def test_read_filter_expressions(self) -> None:
+        unread, read = read_filter("unread"), read_filter("read")
+
+        assert unread is not None and str(unread.compile()) == "papers.read_at IS NULL"
+        assert read is not None and str(read.compile()) == "papers.read_at IS NOT NULL"
+        assert read_filter(None) is None
+
+    def test_read_filter_applied_to_listing(self) -> None:
+        db = _make_db_returning([_mock_paper("A")])
+        listing = db.query.return_value.order_by.return_value
+        listing.filter.return_value = listing  # the read filter keeps the same chain
+
+        SearchService().search(None, db, read="read")
+
+        (expr,), _ = listing.filter.call_args
+        assert str(expr.compile()) == "papers.read_at IS NOT NULL"
+
+    def test_no_read_filter_by_default(self) -> None:
+        db = _make_db_returning([_mock_paper("A")])
+
+        SearchService().search(None, db)
+
+        db.query.return_value.order_by.return_value.filter.assert_not_called()
