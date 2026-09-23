@@ -1,7 +1,12 @@
 {% extends "base.html" %}
 {% block title %}{{ reading_list.name }}{% endblock %}
 {% block content %}
-<h1>{{ reading_list.name }}</h1>
+<div class="heading-row">
+  <h1>{{ reading_list.name }}</h1>
+  <button class="btn-link danger" type="button"
+          hx-delete="/lists/{{ reading_list.id }}"
+          hx-confirm="Delete the list “{{ reading_list.name }}”? Papers in your library are not affected.">Delete list</button>
+</div>
 <p class="subtle">{{ reading_list.items | length }} items · created {{ reading_list.created_at.strftime("%d %b %Y") }}</p>
 {% include "lists/_progress.html" %}
 <ol class="item-list">

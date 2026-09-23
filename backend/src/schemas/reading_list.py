@@ -1,5 +1,8 @@
 """Pydantic schemas for reading lists."""
 
+import uuid
+from datetime import datetime
+
 from pydantic import BaseModel
 
 
@@ -18,3 +21,12 @@ class ListProgress(BaseModel):
 
     read: int
     total: int
+
+
+class ListSummary(BaseModel):
+    """One row of the lists index."""
+
+    id: uuid.UUID
+    name: str
+    created_at: datetime
+    progress: ListProgress

@@ -27,3 +27,9 @@ h1 { font-size: 1.4rem; color: #0f172a; margin-bottom: 0.35rem; }
 .item.is-read .item-title { color: #64748b; text-decoration: line-through; }
 .progress { font-size: 0.9rem; font-weight: 600; color: #334155; margin-top: 0.5rem; }
 .tick { width: 1.15rem; height: 1.15rem; margin-top: 0.15rem; flex-shrink: 0; cursor: pointer; accent-color: #16a34a; }
+.heading-row { display: flex; align-items: baseline; gap: 1rem; }
+.heading-row h1 { flex: 1; }
+.btn-link { background: none; border: none; color: #64748b; font-size: 0.8rem; cursor: pointer; padding: 0.2rem 0.3rem; flex-shrink: 0; }
+.btn-link:hover { color: #1e293b; text-decoration: underline; }
+.btn-link.danger:hover { color: #dc2626; }
+a.item-title { display: block; }

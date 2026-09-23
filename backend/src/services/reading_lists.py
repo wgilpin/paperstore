@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from sqlalchemy.orm import Session
 
 from src.models.reading_list import ReadingList, ReadingListItem
-from src.schemas.reading_list import ListProgress, ParsedItem
+from src.schemas.reading_list import ListProgress, ListSummary, ParsedItem
 from src.services.notes import NotFoundError
 
 
@@ -46,9 +46,7 @@ class ReadingListService:
 
         Raises NotFoundError if the item does not exist or belongs to another list.
         """
-        item = db.get(ReadingListItem, item_id)
-        if item is None or item.list_id != list_id:
-            raise NotFoundError(f"Item {item_id} not found in reading list {list_id}")
+        item = self._get_item(list_id, item_id, db)
         # Naive UTC, matching the other timestamps in this database.
         item.read_at = None if item.read_at else datetime.now(tz=UTC).replace(tzinfo=None)
         db.commit()
@@ -58,3 +56,30 @@ class ReadingListService:
         """Count the ticked items of *reading_list*."""
         items = reading_list.items
         return ListProgress(read=sum(1 for i in items if i.read_at), total=len(items))
+
+    def list_summaries(self, db: Session) -> list[ListSummary]:
+        """Return every list with its progress, newest first."""
+        lists = sorted(db.query(ReadingList).all(), key=lambda rl: rl.created_at, reverse=True)
+        return [
+            ListSummary(
+                id=rl.id, name=rl.name, created_at=rl.created_at, progress=self.progress(rl)
+            )
+            for rl in lists
+        ]
+
+    def drop_item(self, list_id: uuid.UUID, item_id: uuid.UUID, db: Session) -> None:
+        """Delete one item from a list. The other items keep their positions."""
+        db.delete(self._get_item(list_id, item_id, db))
+        db.commit()
+
+    def delete_list(self, list_id: uuid.UUID, db: Session) -> None:
+        """Delete a list; the database cascade deletes its items."""
+        db.delete(self.get_list(list_id, db))
+        db.commit()
+
+    def _get_item(self, list_id: uuid.UUID, item_id: uuid.UUID, db: Session) -> ReadingListItem:
+        """Return the item; raise NotFoundError if absent or on another list."""
+        item = db.get(ReadingListItem, item_id)
+        if item is None or item.list_id != list_id:
+            raise NotFoundError(f"Item {item_id} not found in reading list {list_id}")
+        return item
