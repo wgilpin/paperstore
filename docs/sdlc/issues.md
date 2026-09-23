@@ -90,3 +90,27 @@ From the phase 02 epic-03-background-import review. The library submit route run
 **Lands in:** unplanned
 
 From the phase 03 epic-03-item-actions review. arXiv closed the connection at 3,145,728 of 16,402,634 bytes for 2507.06211, twice. The library's own submit uses the same download, so it fails there too.
+
+## ISS-12 — The startup reset of stuck imports writes no log line
+
+**Raised:** 2026-09-23
+**Status:** open
+**Lands in:** unplanned
+
+Found after the second production deploy. `reset_stuck_imports` marks items `import_failed` at startup but logs nothing, so a failure caused by a restart cannot be told apart from a real import failure.
+
+## ISS-13 — The production container installs dev tools at every start
+
+**Raised:** 2026-09-23
+**Status:** open
+**Lands in:** unplanned
+
+Found in the production log. The Dockerfile `CMD` runs `uv run` without `--no-dev`, so each start downloads ruff, mypy and pygments and re-resolves the lock ("Resolving despite existing lockfile"). Startup is slower and needs the network. Use `uv run --no-dev --frozen`.
+
+## ISS-14 — The prod.sh health check passes on a redirect
+
+**Raised:** 2026-09-23
+**Status:** open
+**Lands in:** unplanned
+
+`prod.sh` calls `/tags`, which returns 307 to the login page, and `urlopen` follows it. Any running server passes, even with broken routes. Check an auth-exempt route that exercises the app, or treat a redirect as a failure.
