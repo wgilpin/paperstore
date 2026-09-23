@@ -11,7 +11,7 @@ from src.models.reading_list import ReadingList, ReadingListItem
 from src.schemas.reading_list import Candidate, ParsedItem
 from src.services.ingestion import DuplicateError
 from src.services.notes import NotFoundError
-from src.services.reading_lists import ReadingListService
+from src.services.reading_lists import ReadingListService, safe_url
 
 
 def _item(title: str, year: int | None = 2020, note: str | None = None) -> ParsedItem:
@@ -605,3 +605,74 @@ class TestUploadPdf:
         with pytest.raises(ValueError):
             ReadingListService().upload_pdf(list_id, uuid.uuid4(), _PDF, "x.pdf", db, ingestion)
         assert ingestion.calls == []
+
+
+def _text_item(list_id: uuid.UUID) -> ReadingListItem:
+    item = _stored_item(list_id)
+    item.id = uuid.uuid4()
+    item.status = "done"
+    return item
+
+
+class TestAddUrl:
+    def _run(self, url: str, pdf: bool = False) -> tuple[ReadingListItem, list[uuid.UUID]]:
+        list_id = uuid.uuid4()
+        item = _text_item(list_id)
+        db = MagicMock()
+        db.get.return_value = item
+        with patch(f"{_SVC}.pdf_check", return_value=pdf):
+            started = ReadingListService().add_url(list_id, item.id, url, db)
+        return item, started
+
+    def test_add_arxiv_url_starts_import(self) -> None:
+        item, started = self._run("https://www.alphaxiv.org/abs/2203.08913")
+
+        assert started == [item.id]
+        assert item.status == "importing"
+        assert item.candidate is not None
+        assert item.candidate.arxiv_id == "2203.08913"
+        assert item.candidate.source == "manual"
+
+    def test_add_pdf_url_starts_import(self) -> None:
+        item, started = self._run("https://example.org/paper.pdf", pdf=True)
+
+        assert started == [item.id]
+        assert item.status == "importing"
+        assert item.candidate is not None
+        assert item.candidate.pdf_url == "https://example.org/paper.pdf"
+        assert item.candidate.arxiv_id is None
+
+    def test_add_biorxiv_url_starts_import_without_pdf_check(self) -> None:
+        item, started = self._run("https://www.biorxiv.org/content/10.1101/770495v2")
+
+        assert started == [item.id]
+        assert item.candidate is not None
+        assert item.candidate.pdf_url == "https://www.biorxiv.org/content/10.1101/770495v2"
+
+    def test_add_other_url_sets_plain_link(self) -> None:
+        item, started = self._run("  https://en.wikipedia.org/wiki/Hopfield_network  ")
+
+        assert started == []
+        assert item.url == "https://en.wikipedia.org/wiki/Hopfield_network"
+        assert item.status == "done"
+        assert item.candidate is None
+
+    def test_add_url_refuses_other_schemes(self) -> None:
+        for bad in ("javascript:alert(1)", "ftp://example.org/a.pdf", "", "not a url"):
+            list_id = uuid.uuid4()
+            item = _text_item(list_id)
+            db = MagicMock()
+            db.get.return_value = item
+            with pytest.raises(ValueError):
+                ReadingListService().add_url(list_id, item.id, bad, db)
+            assert item.url is None
+            db.commit.assert_not_called()
+
+
+class TestSafeUrl:
+    def test_safe_url_accepts_only_http(self) -> None:
+        assert safe_url("https://doi.org/10.1038/nn.4401") == "https://doi.org/10.1038/nn.4401"
+        assert safe_url("http://example.org/a") == "http://example.org/a"
+        assert safe_url("javascript:alert(1)") is None
+        assert safe_url("HTTPS://") is None
+        assert safe_url(None) is None

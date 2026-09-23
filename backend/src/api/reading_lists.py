@@ -15,11 +15,14 @@ from starlette.responses import Response
 
 from src.db import get_session
 from src.services.reading_list_parser import ReadingListParser
-from src.services.reading_lists import ReadingListService, start_import, start_lookup
+from src.services.reading_lists import ReadingListService, safe_url, start_import, start_lookup
 
 logger = logging.getLogger(__name__)
 
 templates = Jinja2Templates(directory=str(pathlib.Path(__file__).parent.parent / "templates"))
+
+# Templates render an item's link only when it is http(s).
+templates.env.globals["safe_url"] = safe_url
 
 router = APIRouter()
 
@@ -216,3 +219,32 @@ def upload_item_pdf(
         error = "The upload failed. Try again."
     item = service.get_item(list_id, item_id, db)
     return templates.TemplateResponse(request, "lists/_item.html", {"item": item, "error": error})
+
+
+@router.post("/{list_id}/items/{item_id}/link", response_class=HTMLResponse)
+def add_item_link(
+    request: Request,
+    list_id: uuid.UUID,
+    item_id: uuid.UUID,
+    url: str = Form(...),
+    db: Session = Depends(get_session),
+) -> HTMLResponse:
+    """Give an item a URL: import a paper URL, keep any other link; show errors in the row."""
+    service = ReadingListService()
+    error: str | None = None
+    try:
+        start_import(service.add_url(list_id, item_id, url, db))
+    except ValueError as exc:
+        error = str(exc)
+    item = service.get_item(list_id, item_id, db)
+    # The status block comes back out of band, so it polls while the import runs.
+    return templates.TemplateResponse(
+        request,
+        "lists/_item_and_status.html",
+        {
+            "item": item,
+            "error": error,
+            "status": service.lookup_status(service.get_list(list_id, db)),
+            "list_id": list_id,
+        },
+    )

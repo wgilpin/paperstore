@@ -5,6 +5,7 @@ import threading
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
+from urllib.parse import urlparse
 
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -16,7 +17,8 @@ from src.schemas.reading_list import (
     LookupStatus,
     ParsedItem,
 )
-from src.services.citation_resolver import CitationResolver, library_by_doi
+from src.services.biorxiv_client import is_biorxiv_url
+from src.services.citation_resolver import CitationResolver, arxiv_id_in, library_by_doi, pdf_check
 from src.services.ingestion import DuplicateError, IngestionService
 from src.services.notes import NotFoundError
 
@@ -222,6 +224,43 @@ class ReadingListService:
         db.commit()
         return item
 
+    def add_url(
+        self, list_id: uuid.UUID, item_id: uuid.UUID, url: str, db: Session
+    ) -> list[uuid.UUID]:
+        """Give an item without a paper a URL; return the item ID when an import starts.
+
+        An arXiv, alphaXiv or bioRxiv URL, or one that serves a PDF, is set up for the
+        importer. Any other http(s) URL becomes the item's plain link. Raises ValueError
+        for any other scheme, or for a linked item; the item is then unchanged.
+        """
+        clean = safe_url(url.strip())
+        if clean is None:
+            raise ValueError("Use a link that starts with http:// or https://.")
+        item = self._get_item(list_id, item_id, db)
+        if item.paper_id is not None:
+            raise ValueError("This item already links to a paper.")
+        arxiv_id = arxiv_id_in(clean) if _is_arxiv_host(clean) else None
+        if arxiv_id or is_biorxiv_url(clean) or pdf_check(clean):
+            item.candidate = Candidate(
+                source="manual",
+                title=item.title,
+                authors=list(item.authors or []),
+                year=item.year,
+                arxiv_id=arxiv_id,
+                pdf_url=None if arxiv_id else clean,
+                landing_url=clean,
+                confident=True,
+                outcome="free_pdf",
+            )
+            item.status = "importing"
+            db.commit()
+            return [item.id]
+        item.url = clean
+        item.candidate = None
+        item.status = "done"
+        db.commit()
+        return []
+
     def reset_stuck_imports(self, db: Session) -> int:
         """Mark items left importing by a restart as import_failed; return how many."""
         stuck = db.query(ReadingListItem).filter(ReadingListItem.status == "importing").all()
@@ -296,6 +335,22 @@ def _accept(item: ReadingListItem, candidate: Candidate) -> None:
         item.url = candidate.landing_url or (
             f"https://doi.org/{candidate.doi}" if candidate.doi else None
         )
+
+
+def safe_url(url: str | None) -> str | None:
+    """Return *url* when it is an http(s) URL with a host; None for anything else."""
+    if not url:
+        return None
+    parsed = urlparse(url)
+    if parsed.scheme.lower() not in ("http", "https") or not parsed.netloc:
+        return None
+    return url
+
+
+def _is_arxiv_host(url: str) -> bool:
+    """True for arxiv.org and alphaxiv.org URLs, including their subdomains."""
+    host = (urlparse(url).hostname or "").lower()
+    return any(host == d or host.endswith("." + d) for d in ("arxiv.org", "alphaxiv.org"))
 
 
 def _doi_of(url: str | None) -> str | None:

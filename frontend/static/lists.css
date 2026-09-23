@@ -54,3 +54,9 @@ a.btn:hover { text-decoration: none; }
 .item-actions form { display: inline-flex; align-items: center; }
 .item-actions label.btn-link { padding-left: 0; }
 .item-error { font-size: 0.82rem; color: #b91c1c; margin-top: 0.35rem; }
+.add-link summary { list-style: none; display: inline; padding-left: 0; }
+.add-link summary::-webkit-details-marker { display: none; }
+.add-link[open] { flex-basis: 100%; }
+.add-link form { display: flex; gap: 0.5rem; margin-top: 0.35rem; align-items: center; }
+.add-link input { flex: 1; min-width: 0; padding: 0.3rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.85rem; }
+.btn-small { padding: 0.3rem 0.7rem; font-size: 0.82rem; }
