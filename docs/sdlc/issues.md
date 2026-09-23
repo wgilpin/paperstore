@@ -62,8 +62,8 @@ From the phase 02 epic-01-library-match review. A cited arXiv ID or DOI that exi
 ## ISS-8 — Item URLs accept any scheme
 
 **Raised:** 2026-09-23
-**Status:** open
-**Lands in:** unplanned
+**Status:** fixed
+**Lands in:** fixed on epic-02-add-link (phase 03)
 
 From the phase 02 epic-02-outside-lookup review. `_item.html` renders `item.url` as a link without checking for `http` or `https`. Phase 03 lets Will type URLs, so fix it there.
 
@@ -82,3 +82,11 @@ From the phase 02 epic-02-outside-lookup review. Collins 1975 matched a 1988 boo
 **Lands in:** unplanned
 
 From the phase 02 epic-03-background-import review. The library submit route runs `_enrich_paper_async` after ingestion; the list importer does not.
+
+## ISS-11 — Ingestion cannot download some large arXiv PDFs
+
+**Raised:** 2026-09-23
+**Status:** open
+**Lands in:** unplanned
+
+From the phase 03 epic-03-item-actions review. arXiv closed the connection at 3,145,728 of 16,402,634 bytes for 2507.06211, twice. The library's own submit uses the same download, so it fails there too.
