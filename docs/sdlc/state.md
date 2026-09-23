@@ -29,10 +29,10 @@ Updated: 2026-09-23
   - [x] epic-03-tick-items — merged 2026-09-23
   - [x] epic-04-manage-lists — merged 2026-09-23
   - [x] epic-05-parse-again — merged 2026-09-23
-- [ ] 02-find-and-import — in progress
+- [x] 02-find-and-import — done
   - [x] epic-01-library-match — reviewed 2026-09-23
   - [x] epic-02-outside-lookup — reviewed 2026-09-23
-  - [x] epic-03-background-import — reviewed 2026-09-23
+  - [x] epic-03-background-import — merged 2026-09-23
 - [ ] 03-manual-paths — pending
 - [ ] 04-mvp-test — pending
 - [ ] 05-non-paper-material — pending
