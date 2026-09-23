@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Reading lists{% endblock %}
+{% block content %}
+<h1>Reading lists</h1>
+{% if summaries %}
+<ul class="item-list">
+  {% for s in summaries %}
+  <li class="item card" id="list-{{ s.id }}">
+    <div class="item-body">
+      <a class="item-title" href="/lists/{{ s.id }}">{{ s.name }}</a>
+      <div class="item-meta">created {{ s.created_at.strftime("%d %b %Y") }} · {{ s.progress.read }} of {{ s.progress.total }} read</div>
+    </div>
+    <button class="btn-link danger" type="button"
+            hx-delete="/lists/{{ s.id }}"
+            hx-confirm="Delete the list “{{ s.name }}”? Papers in your library are not affected.">Delete</button>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="subtle" style="margin-top: 1rem">No reading lists yet. <a href="/lists/new">Paste one</a>.</p>
+{% endif %}
+{% endblock %}

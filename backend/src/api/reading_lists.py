@@ -28,6 +28,13 @@ def _redirect(request: Request, url: str) -> Response:
     return RedirectResponse(url, status_code=303)
 
 
+@router.get("", response_class=HTMLResponse)
+def lists_index(request: Request, db: Session = Depends(get_session)) -> HTMLResponse:
+    """Show every reading list, newest first, with its progress."""
+    summaries = ReadingListService().list_summaries(db)
+    return templates.TemplateResponse(request, "lists/index.html", {"summaries": summaries})
+
+
 @router.get("/new", response_class=HTMLResponse)
 def new_list_form(request: Request) -> HTMLResponse:
     """Show the paste form for a new reading list."""
@@ -77,3 +84,24 @@ def tick_item(
     return templates.TemplateResponse(
         request, "lists/_tick.html", {"item": item, "progress": progress}
     )
+
+
+@router.delete("/{list_id}/items/{item_id}", response_class=HTMLResponse)
+def drop_item(
+    request: Request,
+    list_id: uuid.UUID,
+    item_id: uuid.UUID,
+    db: Session = Depends(get_session),
+) -> HTMLResponse:
+    """Drop an item; the empty body removes it, and the progress line updates out of band."""
+    service = ReadingListService()
+    service.drop_item(list_id, item_id, db)
+    progress = service.progress(service.get_list(list_id, db))
+    return templates.TemplateResponse(request, "lists/_drop.html", {"progress": progress})
+
+
+@router.delete("/{list_id}")
+def delete_list(list_id: uuid.UUID, db: Session = Depends(get_session)) -> Response:
+    """Delete a list and its items, then send the browser to the lists index."""
+    ReadingListService().delete_list(list_id, db)
+    return Response(status_code=204, headers={"HX-Redirect": "/lists"})

@@ -120,3 +120,82 @@ class TestProgress:
         progress = ReadingListService().progress(reading_list)
 
         assert (progress.read, progress.total) == (2, 4)
+
+
+class TestListSummaries:
+    def test_list_summaries_newest_first_with_progress(self) -> None:
+        older_id, newer_id = uuid.uuid4(), uuid.uuid4()
+        older = ReadingList(
+            id=older_id,
+            name="Older",
+            raw_text="raw",
+            created_at=datetime(2026, 9, 1, 9, 0),
+            items=[_stored_item(older_id, read_at=datetime(2026, 9, 2)), _stored_item(older_id)],
+        )
+        newer = ReadingList(
+            id=newer_id,
+            name="Newer",
+            raw_text="raw",
+            created_at=datetime(2026, 9, 20, 9, 0),
+            items=[_stored_item(newer_id)],
+        )
+        db = MagicMock()
+        db.query.return_value.all.return_value = [older, newer]
+
+        summaries = ReadingListService().list_summaries(db)
+
+        assert [s.name for s in summaries] == ["Newer", "Older"]
+        assert summaries[0].id == newer_id
+        assert summaries[0].created_at == datetime(2026, 9, 20, 9, 0)
+        assert (summaries[1].progress.read, summaries[1].progress.total) == (1, 2)
+
+
+class TestDropItem:
+    def test_drop_item_deletes_only_that_item(self) -> None:
+        list_id = uuid.uuid4()
+        first, second, third = (_stored_item(list_id) for _ in range(3))
+        first.position, second.position, third.position = 0, 1, 2
+        db = MagicMock()
+        db.get.return_value = second
+
+        ReadingListService().drop_item(list_id, uuid.uuid4(), db)
+
+        db.delete.assert_called_once_with(second)
+        db.commit.assert_called_once()
+        assert (first.position, third.position) == (0, 2)
+
+    def test_drop_item_unknown_raises_not_found(self) -> None:
+        db = MagicMock()
+        db.get.return_value = None
+
+        with pytest.raises(NotFoundError):
+            ReadingListService().drop_item(uuid.uuid4(), uuid.uuid4(), db)
+        db.delete.assert_not_called()
+
+    def test_drop_item_of_another_list_raises_not_found(self) -> None:
+        db = MagicMock()
+        db.get.return_value = _stored_item(uuid.uuid4())
+
+        with pytest.raises(NotFoundError):
+            ReadingListService().drop_item(uuid.uuid4(), uuid.uuid4(), db)
+        db.delete.assert_not_called()
+
+
+class TestDeleteList:
+    def test_delete_list_deletes_list(self) -> None:
+        stored = ReadingList(name="Memory", raw_text="raw")
+        db = MagicMock()
+        db.get.return_value = stored
+
+        ReadingListService().delete_list(uuid.uuid4(), db)
+
+        db.delete.assert_called_once_with(stored)
+        db.commit.assert_called_once()
+
+    def test_delete_list_unknown_raises_not_found(self) -> None:
+        db = MagicMock()
+        db.get.return_value = None
+
+        with pytest.raises(NotFoundError):
+            ReadingListService().delete_list(uuid.uuid4(), db)
+        db.delete.assert_not_called()
