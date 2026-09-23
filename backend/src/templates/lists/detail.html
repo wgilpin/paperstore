@@ -3,6 +3,7 @@
 {% block content %}
 <h1>{{ reading_list.name }}</h1>
 <p class="subtle">{{ reading_list.items | length }} items · created {{ reading_list.created_at.strftime("%d %b %Y") }}</p>
+{% include "lists/_progress.html" %}
 <ol class="item-list">
   {% for item in reading_list.items %}
     {% include "lists/_item.html" %}

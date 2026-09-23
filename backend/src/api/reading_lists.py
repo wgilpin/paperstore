@@ -54,5 +54,26 @@ def list_detail(
     request: Request, list_id: uuid.UUID, db: Session = Depends(get_session)
 ) -> HTMLResponse:
     """Show one reading list with its items in order."""
-    reading_list = ReadingListService().get_list(list_id, db)
-    return templates.TemplateResponse(request, "lists/detail.html", {"reading_list": reading_list})
+    service = ReadingListService()
+    reading_list = service.get_list(list_id, db)
+    return templates.TemplateResponse(
+        request,
+        "lists/detail.html",
+        {"reading_list": reading_list, "progress": service.progress(reading_list)},
+    )
+
+
+@router.post("/{list_id}/items/{item_id}/tick", response_class=HTMLResponse)
+def tick_item(
+    request: Request,
+    list_id: uuid.UUID,
+    item_id: uuid.UUID,
+    db: Session = Depends(get_session),
+) -> HTMLResponse:
+    """Toggle an item's tick; return the item and, out of band, the progress line."""
+    service = ReadingListService()
+    item = service.toggle_tick(list_id, item_id, db)
+    progress = service.progress(service.get_list(list_id, db))
+    return templates.TemplateResponse(
+        request, "lists/_tick.html", {"item": item, "progress": progress}
+    )

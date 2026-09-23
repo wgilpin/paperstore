@@ -11,3 +11,10 @@ class ParsedItem(BaseModel):
     authors: list[str]
     year: int | None
     note: str | None
+
+
+class ListProgress(BaseModel):
+    """How many items of a reading list are ticked."""
+
+    read: int
+    total: int
