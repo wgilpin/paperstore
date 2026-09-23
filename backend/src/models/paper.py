@@ -33,6 +33,10 @@ class Paper(Base):
     summary_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     summary_image: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
     added_at: Mapped[datetime] = mapped_column(nullable=False, server_default=func.now())
+    # Shared read flag: ticking this paper on any reading list sets it.
+    read_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    # Second dedupe key next to arxiv_id; unique index created in create_tables().
+    doi: Mapped[str | None] = mapped_column(Text, nullable=True)
     # search_vector is a GENERATED ALWAYS column — created by raw DDL in create_tables().
     # server_default=FetchedValue() tells SQLAlchemy the DB owns this column;
     # never include in INSERT/UPDATE.

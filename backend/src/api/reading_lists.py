@@ -66,7 +66,14 @@ def list_detail(
     return templates.TemplateResponse(
         request,
         "lists/detail.html",
-        {"reading_list": reading_list, "progress": service.progress(reading_list)},
+        {
+            "reading_list": reading_list,
+            "progress": service.progress(reading_list),
+            "pending_review": len(service.review_items(reading_list)),
+            "unlooked": sum(
+                1 for i in reading_list.items if i.status == "new" and i.paper_id is None
+            ),
+        },
     )
 
 
@@ -117,3 +124,50 @@ def parse_list_again(
     items = ReadingListParser().parse(reading_list.raw_text)
     service.parse_again(list_id, items, db)
     return _redirect(request, f"/lists/{list_id}")
+
+
+# Labels for lookup outcomes on the review page.
+_OUTCOME_LABELS = {
+    "in_library": "In your library",
+    "free_pdf": "Free PDF",
+    "record_only": "Record only, no free PDF",
+    "not_found": "Not found",
+}
+
+
+@router.post("/{list_id}/find")
+def find_papers(
+    request: Request, list_id: uuid.UUID, db: Session = Depends(get_session)
+) -> Response:
+    """Look up the list's unlinked items, then open the review page."""
+    ReadingListService().find_papers(list_id, db)
+    return _redirect(request, f"/lists/{list_id}/review")
+
+
+@router.get("/{list_id}/review", response_class=HTMLResponse)
+def review_page(
+    request: Request, list_id: uuid.UUID, db: Session = Depends(get_session)
+) -> HTMLResponse:
+    """Show each looked-up item with its match, for Will to accept or reject."""
+    service = ReadingListService()
+    reading_list = service.get_list(list_id, db)
+    return templates.TemplateResponse(
+        request,
+        "lists/review.html",
+        {
+            "reading_list": reading_list,
+            "items": service.review_items(reading_list),
+            "outcome_labels": _OUTCOME_LABELS,
+        },
+    )
+
+
+@router.post("/{list_id}/review")
+def submit_review(
+    list_id: uuid.UUID,
+    accept: list[uuid.UUID] = Form(default=[]),
+    db: Session = Depends(get_session),
+) -> Response:
+    """Apply the accepted matches and go back to the list."""
+    ReadingListService().apply_review(list_id, set(accept), db)
+    return RedirectResponse(f"/lists/{list_id}", status_code=303)

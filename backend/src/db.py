@@ -175,6 +175,23 @@ def create_tables() -> None:
         conn.execute(text(_add_parse_failed_sql))
         conn.commit()
 
+    # Reading lists phase 02: shared read flag and DOI on papers; link and lookup
+    # state on list items. Idempotent, so safe on every startup.
+    _reading_list_links_sql = """
+    ALTER TABLE papers ADD COLUMN IF NOT EXISTS read_at TIMESTAMP;
+    ALTER TABLE papers ADD COLUMN IF NOT EXISTS doi TEXT;
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_papers_doi ON papers (doi);
+    ALTER TABLE reading_list_items
+        ADD COLUMN IF NOT EXISTS paper_id UUID REFERENCES papers (id) ON DELETE SET NULL;
+    ALTER TABLE reading_list_items ADD COLUMN IF NOT EXISTS url TEXT;
+    ALTER TABLE reading_list_items ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'new';
+    ALTER TABLE reading_list_items ADD COLUMN IF NOT EXISTS outcome TEXT;
+    ALTER TABLE reading_list_items ADD COLUMN IF NOT EXISTS candidate_json TEXT;
+    """
+    with engine.connect() as conn:
+        conn.execute(text(_reading_list_links_sql))
+        conn.commit()
+
     # Add summary_image column to papers if it was created before this column existed.
     _add_summary_image_sql = """
     ALTER TABLE papers ADD COLUMN IF NOT EXISTS summary_image BYTEA;

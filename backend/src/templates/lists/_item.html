@@ -1,10 +1,14 @@
-<li class="item card{% if item.read_at %} is-read{% endif %}" id="item-{{ item.id }}">
+<li class="item card{% if item.is_read %} is-read{% endif %}" id="item-{{ item.id }}">
   <input class="tick" type="checkbox" aria-label="Read {{ item.title }}"
-         {% if item.read_at %}checked{% endif %}
+         {% if item.is_read %}checked{% endif %}
          hx-post="/lists/{{ item.list_id }}/items/{{ item.id }}/tick"
          hx-target="#item-{{ item.id }}" hx-swap="outerHTML" />
   <div class="item-body">
+    {% if item.paper_id %}
+    <a class="item-title" href="/paper.html?id={{ item.paper_id }}">{{ item.title }}</a>
+    {% else %}
     <div class="item-title">{{ item.title }}</div>
+    {% endif %}
     <div class="item-meta">
       {%- if item.authors %}{{ item.authors | join(", ") }}{% endif -%}
       {%- if item.authors and item.year %} · {% endif -%}
