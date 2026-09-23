@@ -515,3 +515,93 @@ class TestImport:
         assert stuck.status == "import_failed"
         assert stuck.url == "https://example.org/memorizing"
         db.commit.assert_called_once()
+
+
+class _FakeLocalIngestion:
+    """Stands in for IngestionService.ingest_local."""
+
+    def __init__(self, result: Paper | Exception) -> None:
+        self.result = result
+        self.calls: list[tuple[bytes, str, str | None]] = []
+
+    def ingest_local(
+        self, pdf_bytes: bytes, local_path: object, db: object, source_url: str | None = None
+    ) -> Paper:
+        self.calls.append((pdf_bytes, str(local_path), source_url))
+        if isinstance(self.result, Exception):
+            raise self.result
+        return self.result
+
+
+def _record_only_item(list_id: uuid.UUID) -> ReadingListItem:
+    item = _stored_item(list_id)
+    item.status = "done"
+    item.url = "https://doi.org/10.1038/nn.4401"
+    return item
+
+
+_PDF = b"%PDF-1.7 fake body"
+
+
+class TestUploadPdf:
+    @patch(f"{_SVC}.library_by_doi", return_value=None)
+    def test_upload_pdf_links_item_and_sets_doi(self, by_doi: MagicMock) -> None:
+        list_id = uuid.uuid4()
+        item = _record_only_item(list_id)
+        paper = Paper(id=uuid.uuid4(), title="Computational principles")
+        db = MagicMock()
+        db.get.return_value = item
+        ingestion = _FakeLocalIngestion(paper)
+
+        ReadingListService().upload_pdf(list_id, uuid.uuid4(), _PDF, "benna.pdf", db, ingestion)
+
+        assert ingestion.calls == [(_PDF, "benna.pdf", "https://doi.org/10.1038/nn.4401")]
+        assert item.paper_id == paper.id
+        assert item.status == "done"
+        assert paper.doi == "10.1038/nn.4401"
+        db.commit.assert_called_once()
+
+    def test_upload_non_pdf_is_refused(self) -> None:
+        list_id = uuid.uuid4()
+        item = _record_only_item(list_id)
+        db = MagicMock()
+        db.get.return_value = item
+        ingestion = _FakeLocalIngestion(Paper(id=uuid.uuid4(), title="t"))
+
+        with pytest.raises(ValueError):
+            ReadingListService().upload_pdf(
+                list_id, uuid.uuid4(), b"hello", "notes.pdf", db, ingestion
+            )
+        assert ingestion.calls == []
+        assert item.paper_id is None
+        db.commit.assert_not_called()
+
+    def test_upload_duplicate_links_existing_paper(self) -> None:
+        list_id = uuid.uuid4()
+        item = _record_only_item(list_id)
+        existing_id = uuid.uuid4()
+        db = MagicMock()
+        db.get.return_value = item
+
+        ReadingListService().upload_pdf(
+            list_id,
+            uuid.uuid4(),
+            _PDF,
+            "benna.pdf",
+            db,
+            _FakeLocalIngestion(DuplicateError("exists", paper_id=str(existing_id))),
+        )
+
+        assert item.paper_id == existing_id
+
+    def test_upload_only_for_items_without_paper(self) -> None:
+        list_id = uuid.uuid4()
+        item = _record_only_item(list_id)
+        item.paper_id = uuid.uuid4()
+        db = MagicMock()
+        db.get.return_value = item
+        ingestion = _FakeLocalIngestion(Paper(id=uuid.uuid4(), title="t"))
+
+        with pytest.raises(ValueError):
+            ReadingListService().upload_pdf(list_id, uuid.uuid4(), _PDF, "x.pdf", db, ingestion)
+        assert ingestion.calls == []

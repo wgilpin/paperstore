@@ -49,3 +49,8 @@ a.btn:hover { text-decoration: none; }
 .badge-weak { background: #fef3c7; color: #92400e; }
 .badge-importing { background: #e0e7ff; color: #3730a3; margin-top: 0.35rem; }
 .badge-failed { background: #fee2e2; color: #991b1b; margin-top: 0.35rem; }
+.item-actions { display: flex; flex-wrap: wrap; gap: 0.25rem 0.75rem; margin-top: 0.35rem; }
+.item-actions:empty { display: none; }
+.item-actions form { display: inline-flex; align-items: center; }
+.item-actions label.btn-link { padding-left: 0; }
+.item-error { font-size: 0.82rem; color: #b91c1c; margin-top: 0.35rem; }
