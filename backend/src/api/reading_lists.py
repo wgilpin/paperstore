@@ -248,3 +248,69 @@ def add_item_link(
             "list_id": list_id,
         },
     )
+
+
+def _item_and_status(
+    request: Request,
+    service: ReadingListService,
+    list_id: uuid.UUID,
+    item_id: uuid.UUID,
+    error: str | None,
+    db: Session,
+) -> HTMLResponse:
+    """The item row, plus the status block and progress line out of band."""
+    reading_list = service.get_list(list_id, db)
+    return templates.TemplateResponse(
+        request,
+        "lists/_item_and_status.html",
+        {
+            "item": service.get_item(list_id, item_id, db),
+            "error": error,
+            "status": service.lookup_status(reading_list),
+            "progress": service.progress(reading_list),
+            "list_id": list_id,
+        },
+    )
+
+
+@router.post("/{list_id}/items/{item_id}/search", response_class=HTMLResponse)
+def search_item_again(
+    request: Request, list_id: uuid.UUID, item_id: uuid.UUID, db: Session = Depends(get_session)
+) -> HTMLResponse:
+    """Send one item back through lookup."""
+    service = ReadingListService()
+    error: str | None = None
+    try:
+        service.search_again(list_id, item_id, db)
+        start_lookup(list_id)
+    except ValueError as exc:
+        error = str(exc)
+    return _item_and_status(request, service, list_id, item_id, error, db)
+
+
+@router.post("/{list_id}/items/{item_id}/unlink", response_class=HTMLResponse)
+def unlink_item(
+    request: Request, list_id: uuid.UUID, item_id: uuid.UUID, db: Session = Depends(get_session)
+) -> HTMLResponse:
+    """Remove an item's paper link; the paper stays in the library."""
+    service = ReadingListService()
+    error: str | None = None
+    try:
+        service.unlink(list_id, item_id, db)
+    except ValueError as exc:
+        error = str(exc)
+    return _item_and_status(request, service, list_id, item_id, error, db)
+
+
+@router.post("/{list_id}/items/{item_id}/retry", response_class=HTMLResponse)
+def retry_item_import(
+    request: Request, list_id: uuid.UUID, item_id: uuid.UUID, db: Session = Depends(get_session)
+) -> HTMLResponse:
+    """Run a failed import again."""
+    service = ReadingListService()
+    error: str | None = None
+    try:
+        start_import(service.retry_import(list_id, item_id, db))
+    except ValueError as exc:
+        error = str(exc)
+    return _item_and_status(request, service, list_id, item_id, error, db)

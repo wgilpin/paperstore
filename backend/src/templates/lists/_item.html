@@ -31,6 +31,22 @@
         <span class="htmx-indicator">Uploading…</span>
       </form>
       {% endif %}
+      {% if item.paper_id %}
+      <button class="btn-link" type="button"
+              hx-post="/lists/{{ item.list_id }}/items/{{ item.id }}/unlink"
+              hx-target="#item-{{ item.id }}" hx-swap="outerHTML"
+              hx-confirm="Unlink “{{ item.title }}” from its paper? The paper stays in your library.">Unlink</button>
+      {% endif %}
+      {% if item.status == "import_failed" %}
+      <button class="btn-link" type="button"
+              hx-post="/lists/{{ item.list_id }}/items/{{ item.id }}/retry"
+              hx-target="#item-{{ item.id }}" hx-swap="outerHTML">Retry import</button>
+      {% endif %}
+      {% if not item.paper_id and item.status in ("done", "import_failed") %}
+      <button class="btn-link" type="button"
+              hx-post="/lists/{{ item.list_id }}/items/{{ item.id }}/search"
+              hx-target="#item-{{ item.id }}" hx-swap="outerHTML">Search again</button>
+      {% endif %}
       {% if not item.paper_id and item.status in ("done", "import_failed", "new") %}
       <details class="add-link">
         <summary class="btn-link">{{ "Change link" if item.url else "Add link" }}</summary>

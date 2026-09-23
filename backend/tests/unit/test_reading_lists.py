@@ -676,3 +676,77 @@ class TestSafeUrl:
         assert safe_url("javascript:alert(1)") is None
         assert safe_url("HTTPS://") is None
         assert safe_url(None) is None
+
+
+class TestItemActions:
+    def _db_with(self, item: ReadingListItem) -> MagicMock:
+        db = MagicMock()
+        db.get.return_value = item
+        return db
+
+    def test_search_again_resets_item_for_lookup(self) -> None:
+        list_id = uuid.uuid4()
+        item = _text_item(list_id)
+        item.outcome = "not_found"
+        item.candidate = _library_candidate(uuid.uuid4())
+        db = self._db_with(item)
+
+        ReadingListService().search_again(list_id, item.id, db)
+
+        assert (item.status, item.outcome, item.candidate) == ("new", None, None)
+        db.commit.assert_called_once()
+
+    def test_search_again_refused_for_linked_item(self) -> None:
+        list_id = uuid.uuid4()
+        item = _text_item(list_id)
+        item.paper_id = uuid.uuid4()
+        db = self._db_with(item)
+
+        with pytest.raises(ValueError):
+            ReadingListService().search_again(list_id, item.id, db)
+        assert item.status == "done"
+        db.commit.assert_not_called()
+
+    def test_unlink_clears_paper(self) -> None:
+        list_id = uuid.uuid4()
+        paper = Paper(id=uuid.uuid4(), title="Titans", read_at=datetime(2026, 9, 1))
+        item = _text_item(list_id)
+        item.paper_id, item.paper = paper.id, paper
+        db = self._db_with(item)
+
+        ReadingListService().unlink(list_id, item.id, db)
+
+        assert item.paper_id is None
+        assert item.paper is None
+        assert item.status == "done"
+        assert paper.read_at == datetime(2026, 9, 1)  # the paper keeps its read state
+        db.delete.assert_not_called()
+        db.commit.assert_called_once()
+
+    def test_unlink_refused_without_paper(self) -> None:
+        list_id = uuid.uuid4()
+        item = _text_item(list_id)
+        db = self._db_with(item)
+
+        with pytest.raises(ValueError):
+            ReadingListService().unlink(list_id, item.id, db)
+
+    def test_retry_sets_importing_again(self) -> None:
+        item = _importing_item(_free_pdf_candidate())
+        item.status = "import_failed"
+        db = self._db_with(item)
+
+        started = ReadingListService().retry_import(item.list_id, item.id, db)
+
+        assert started == [item.id]
+        assert item.status == "importing"
+        db.commit.assert_called_once()
+
+    def test_retry_refused_unless_import_failed(self) -> None:
+        list_id = uuid.uuid4()
+        item = _text_item(list_id)
+        db = self._db_with(item)
+
+        with pytest.raises(ValueError):
+            ReadingListService().retry_import(list_id, item.id, db)
+        assert item.status == "done"

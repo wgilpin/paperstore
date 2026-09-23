@@ -1,2 +1,3 @@
 {% include "lists/_item.html" %}
 {% with oob = true %}{% include "lists/_lookup_status.html" %}{% endwith %}
+{% if progress %}{% with oob = true %}{% include "lists/_progress.html" %}{% endwith %}{% endif %}
