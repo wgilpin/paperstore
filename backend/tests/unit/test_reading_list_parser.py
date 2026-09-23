@@ -72,6 +72,25 @@ class TestReadingListParser:
         assert kwargs["model"] == "test-model"
         assert "my pasted list" in kwargs["contents"]
 
+    @patch("src.services.reading_list_parser.genai.Client")
+    def test_returns_empty_on_invalid_json(self, mock_client_class: MagicMock) -> None:
+        _mock_client(mock_client_class, "not json [")
+
+        assert ReadingListParser().parse("raw list text") == []
+
+    @patch("src.services.reading_list_parser.genai.Client")
+    def test_returns_empty_on_empty_response(self, mock_client_class: MagicMock) -> None:
+        _mock_client(mock_client_class, None)
+
+        assert ReadingListParser().parse("raw list text") == []
+
+    @patch("src.services.reading_list_parser.genai.Client")
+    def test_returns_empty_on_gemini_error(self, mock_client_class: MagicMock) -> None:
+        client = _mock_client(mock_client_class, "[]")
+        client.models.generate_content.side_effect = RuntimeError("503 unavailable")
+
+        assert ReadingListParser().parse("raw list text") == []
+
 
 class TestReadingListParserConfig:
     @patch.dict("os.environ", {"GEMINI_API_KEY": "", "GEMINI_PDF_MODEL": "test-model"})

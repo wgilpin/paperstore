@@ -167,6 +167,14 @@ def create_tables() -> None:
         conn.execute(text(_add_summary_text_sql))
         conn.commit()
 
+    # Add parse_failed column to reading_lists if it was created before this column existed.
+    _add_parse_failed_sql = """
+    ALTER TABLE reading_lists ADD COLUMN IF NOT EXISTS parse_failed BOOLEAN NOT NULL DEFAULT FALSE;
+    """
+    with engine.connect() as conn:
+        conn.execute(text(_add_parse_failed_sql))
+        conn.commit()
+
     # Add summary_image column to papers if it was created before this column existed.
     _add_summary_image_sql = """
     ALTER TABLE papers ADD COLUMN IF NOT EXISTS summary_image BYTEA;

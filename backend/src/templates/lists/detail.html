@@ -8,7 +8,19 @@
           hx-confirm="Delete the list “{{ reading_list.name }}”? Papers in your library are not affected.">Delete list</button>
 </div>
 <p class="subtle">{{ reading_list.items | length }} items · created {{ reading_list.created_at.strftime("%d %b %Y") }}</p>
+{% if reading_list.parse_failed %}
+<div class="card notice">
+  <p><strong>Parsing failed.</strong> No items were found in the pasted text. The text is kept below.</p>
+  <form method="post" action="/lists/{{ reading_list.id }}/parse"
+        hx-post="/lists/{{ reading_list.id }}/parse" hx-disabled-elt="find button">
+    <button class="btn" type="submit">Parse again</button>
+    <span class="htmx-indicator">Reading the list…</span>
+  </form>
+  <pre class="raw-text">{{ reading_list.raw_text }}</pre>
+</div>
+{% else %}
 {% include "lists/_progress.html" %}
+{% endif %}
 <ol class="item-list">
   {% for item in reading_list.items %}
     {% include "lists/_item.html" %}
