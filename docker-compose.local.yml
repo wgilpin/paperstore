@@ -13,6 +13,8 @@ services:
       GOOGLE_REDIRECT_URI: http://localhost:8000/auth/callback
       GOOGLE_JS_ORIGIN: http://localhost:8000
       OAUTHLIB_INSECURE_TRANSPORT: "1"
+      # Dev uploads go to DEV_DRIVE_FOLDER_ID, or the Drive root, never the production folder.
+      DRIVE_FOLDER_ID: ${DEV_DRIVE_FOLDER_ID:-}
     volumes:
       - ./backend/src:/app/src
       - ./frontend:/frontend

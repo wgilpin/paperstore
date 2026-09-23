@@ -1,8 +1,10 @@
-{# Lookup controls for a list page. While a lookup runs, this block polls itself. #}
+{# Lookup controls for a list page. While a lookup or an import runs, this block polls itself. #}
 <div class="actions" id="lookup-status"
-     {% if status.running %}hx-get="/lists/{{ list_id }}/lookup-status" hx-trigger="every 2s" hx-swap="outerHTML"{% endif %}>
+     {% if status.running or status.importing %}hx-get="/lists/{{ list_id }}/lookup-status" hx-trigger="every 2s" hx-swap="outerHTML"{% endif %}>
   {% if status.running %}
   <span class="subtle">Looking up papers… {{ status.looked_up }} of {{ status.looked_up + status.unlooked }}</span>
+  {% elif status.importing %}
+  <span class="subtle">Importing {{ status.importing }} paper{{ "s" if status.importing != 1 }}…</span>
   {% elif status.pending_review %}
   <a class="btn" href="/lists/{{ list_id }}/review">Review matches ({{ status.pending_review }})</a>
   {% elif status.unlooked %}

@@ -2,13 +2,14 @@
 
 import uuid
 from datetime import datetime
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from src.models.paper import Paper
 from src.models.reading_list import ReadingList, ReadingListItem
 from src.schemas.reading_list import Candidate, ParsedItem
+from src.services.ingestion import DuplicateError
 from src.services.notes import NotFoundError
 from src.services.reading_lists import ReadingListService
 
@@ -396,3 +397,121 @@ class TestApplyReviewOutside:
         assert item.url == "https://doi.org/10.1038/nn.4401"
         assert item.paper_id is None
         assert item.status == "done"
+
+
+def _free_pdf_candidate(arxiv_id: str | None = "2203.08913") -> Candidate:
+    return Candidate(
+        source="arxiv" if arxiv_id else "openalex",
+        title="Memorizing Transformers",
+        authors=["Wu"],
+        year=2022,
+        arxiv_id=arxiv_id,
+        doi="10.48550/arxiv.2203.08913",
+        pdf_url="https://example.org/memorizing.pdf",
+        landing_url="https://example.org/memorizing",
+        confident=True,
+        outcome="free_pdf",
+    )
+
+
+class _FakeIngestion:
+    """Stands in for IngestionService: returns a paper, or raises a set error."""
+
+    def __init__(self, result: Paper | Exception) -> None:
+        self.result = result
+        self.urls: list[str] = []
+
+    def ingest(self, url: str, db: object) -> Paper:
+        self.urls.append(url)
+        if isinstance(self.result, Exception):
+            raise self.result
+        return self.result
+
+
+def _importing_item(candidate: Candidate) -> ReadingListItem:
+    item = _review_item(uuid.uuid4(), candidate, "free_pdf")
+    item.status = "importing"
+    return item
+
+
+_SVC = "src.services.reading_lists"
+
+
+class TestImport:
+    def test_accept_free_pdf_marks_importing(self) -> None:
+        list_id = uuid.uuid4()
+        item = _review_item(list_id, _free_pdf_candidate(), "free_pdf")
+        reading_list = ReadingList(id=list_id, name="Memory", raw_text="raw", items=[item])
+        db = MagicMock()
+        db.get.return_value = reading_list
+
+        to_import = ReadingListService().apply_review(list_id, {item.id}, db)
+
+        assert item.status == "importing"
+        assert item.candidate is not None  # the importer needs it
+        assert to_import == [item.id]
+
+    @patch(f"{_SVC}.library_by_doi", return_value=None)
+    def test_import_links_new_paper_and_sets_doi(self, by_doi: MagicMock) -> None:
+        item = _importing_item(_free_pdf_candidate())
+        paper = Paper(id=uuid.uuid4(), title="Memorizing Transformers")
+        db = MagicMock()
+        db.get.return_value = item
+        ingestion = _FakeIngestion(paper)
+
+        ReadingListService().import_item(item.id, db, ingestion)
+
+        assert ingestion.urls == ["https://arxiv.org/abs/2203.08913"]
+        assert item.paper_id == paper.id
+        assert item.status == "done"
+        assert item.candidate is None
+        assert paper.doi == "10.48550/arxiv.2203.08913"
+
+    @patch(f"{_SVC}.library_by_doi", return_value=None)
+    def test_import_without_arxiv_id_uses_the_pdf_url(self, by_doi: MagicMock) -> None:
+        item = _importing_item(_free_pdf_candidate(arxiv_id=None))
+        db = MagicMock()
+        db.get.return_value = item
+        ingestion = _FakeIngestion(Paper(id=uuid.uuid4(), title="t"))
+
+        ReadingListService().import_item(item.id, db, ingestion)
+
+        assert ingestion.urls == ["https://example.org/memorizing.pdf"]
+
+    def test_import_duplicate_links_existing_paper(self) -> None:
+        item = _importing_item(_free_pdf_candidate())
+        existing_id = uuid.uuid4()
+        db = MagicMock()
+        db.get.return_value = item
+
+        ReadingListService().import_item(
+            item.id, db, _FakeIngestion(DuplicateError("exists", paper_id=str(existing_id)))
+        )
+
+        assert item.paper_id == existing_id
+        assert item.status == "done"
+
+    def test_import_failure_marks_item_and_keeps_url(self) -> None:
+        item = _importing_item(_free_pdf_candidate())
+        db = MagicMock()
+        db.get.return_value = item
+
+        ReadingListService().import_item(item.id, db, _FakeIngestion(RuntimeError("HTTP 403")))
+
+        db.rollback.assert_called_once()
+        assert item.status == "import_failed"
+        assert item.paper_id is None
+        assert item.url == "https://example.org/memorizing"
+        assert item.candidate is not None  # kept for a retry
+
+    def test_reset_stuck_imports_marks_import_failed(self) -> None:
+        stuck = _importing_item(_free_pdf_candidate())
+        db = MagicMock()
+        db.query.return_value.filter.return_value.all.return_value = [stuck]
+
+        count = ReadingListService().reset_stuck_imports(db)
+
+        assert count == 1
+        assert stuck.status == "import_failed"
+        assert stuck.url == "https://example.org/memorizing"
+        db.commit.assert_called_once()

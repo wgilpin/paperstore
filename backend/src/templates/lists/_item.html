@@ -16,6 +16,8 @@
       {%- if item.authors and item.year %} · {% endif -%}
       {%- if item.year %}{{ item.year }}{% endif -%}
     </div>
+    {% if item.status == "importing" %}<span class="badge badge-importing">Importing…</span>{% endif %}
+    {% if item.status == "import_failed" %}<span class="badge badge-failed">Import failed</span>{% endif %}
     {% if item.note %}<div class="item-note">{{ item.note }}</div>{% endif %}
   </div>
   <button class="btn-link" type="button" title="Drop this item from the list"

@@ -14,7 +14,7 @@ from starlette.responses import Response
 
 from src.db import get_session
 from src.services.reading_list_parser import ReadingListParser
-from src.services.reading_lists import ReadingListService, start_lookup
+from src.services.reading_lists import ReadingListService, start_import, start_lookup
 
 templates = Jinja2Templates(directory=str(pathlib.Path(__file__).parent.parent / "templates"))
 
@@ -154,10 +154,12 @@ def lookup_status(
     """The list page's lookup controls; polled every 2 seconds while a lookup runs."""
     service = ReadingListService()
     reading_list = service.get_list(list_id, db)
+    status = service.lookup_status(reading_list)
+    if not status.running and not status.importing:
+        # The poll that sees the work finish reloads the page, so the items update.
+        return HTMLResponse("", headers={"HX-Refresh": "true"})
     return templates.TemplateResponse(
-        request,
-        "lists/_lookup_status.html",
-        {"status": service.lookup_status(reading_list), "list_id": list_id},
+        request, "lists/_lookup_status.html", {"status": status, "list_id": list_id}
     )
 
 
@@ -185,6 +187,6 @@ def submit_review(
     accept: list[uuid.UUID] = Form(default=[]),
     db: Session = Depends(get_session),
 ) -> Response:
-    """Apply the accepted matches and go back to the list."""
-    ReadingListService().apply_review(list_id, set(accept), db)
+    """Apply the accepted matches, start importing free PDFs, and go back to the list."""
+    start_import(ReadingListService().apply_review(list_id, set(accept), db))
     return RedirectResponse(f"/lists/{list_id}", status_code=303)
