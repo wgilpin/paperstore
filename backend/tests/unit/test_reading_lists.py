@@ -770,3 +770,49 @@ class TestUploadAfterFailedImport:
         assert item.status == "done"
         assert item.candidate is None
         assert paper.doi == "10.48550/arxiv.2203.08913"
+
+
+def _openalex_pdf_candidate(doi: str, pdf_url: str) -> Candidate:
+    return Candidate(
+        source="openalex",
+        title="The Tolman-Eichenbaum Machine",
+        authors=["Whittington"],
+        year=2019,
+        doi=doi,
+        pdf_url=pdf_url,
+        landing_url=f"https://doi.org/{doi}",
+        confident=True,
+        outcome="free_pdf",
+    )
+
+
+class TestImportUrl:
+    @patch(f"{_SVC}.library_by_doi", return_value=None)
+    def test_biorxiv_pdf_imports_through_the_canonical_page(self, by_doi: MagicMock) -> None:
+        item = _importing_item(
+            _openalex_pdf_candidate(
+                "10.1101/770495",
+                "https://www.biorxiv.org/content/biorxiv/early/2019/09/24/770495.full.pdf",
+            )
+        )
+        db = MagicMock()
+        db.get.return_value = item
+        ingestion = _FakeIngestion(Paper(id=uuid.uuid4(), title="t"))
+
+        ReadingListService().import_item(item.id, db, ingestion)
+
+        assert ingestion.urls == ["https://www.biorxiv.org/content/10.1101/770495"]
+
+    @patch(f"{_SVC}.library_by_doi", return_value=None)
+    def test_non_biorxiv_10_1101_doi_keeps_the_pdf_url(self, by_doi: MagicMock) -> None:
+        # Cold Spring Harbor journals share the 10.1101 prefix but are not bioRxiv.
+        item = _importing_item(
+            _openalex_pdf_candidate("10.1101/gad.1234", "https://genesdev.cshlp.org/a.full.pdf")
+        )
+        db = MagicMock()
+        db.get.return_value = item
+        ingestion = _FakeIngestion(Paper(id=uuid.uuid4(), title="t"))
+
+        ReadingListService().import_item(item.id, db, ingestion)
+
+        assert ingestion.urls == ["https://genesdev.cshlp.org/a.full.pdf"]

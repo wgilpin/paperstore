@@ -17,7 +17,7 @@ from src.schemas.reading_list import (
     LookupStatus,
     ParsedItem,
 )
-from src.services.biorxiv_client import is_biorxiv_url
+from src.services.biorxiv_client import canonical_biorxiv_url, is_biorxiv_url
 from src.services.citation_resolver import CitationResolver, arxiv_id_in, library_by_doi, pdf_check
 from src.services.ingestion import DuplicateError, IngestionService
 from src.services.notes import NotFoundError
@@ -157,11 +157,7 @@ class ReadingListService:
             _mark_import_failed(item)
             db.commit()
             return
-        url = (
-            f"https://arxiv.org/abs/{candidate.arxiv_id}"
-            if candidate.arxiv_id
-            else candidate.pdf_url or ""
-        )
+        url = _import_url(candidate)
         try:
             paper = (ingestion or IngestionService()).ingest(url, db)
         except DuplicateError as exc:
@@ -391,6 +387,21 @@ def _doi_of(url: str | None) -> str | None:
     if url and url.lower().startswith(prefix):
         return url[len(prefix) :].lower() or None
     return None
+
+
+def _import_url(candidate: Candidate) -> str:
+    """The URL to hand to ingestion for *candidate*.
+
+    arXiv papers go in by their abstract page. A bioRxiv preprint goes in by its
+    canonical page, built from the DOI, because OpenAlex often gives an old-style
+    bioRxiv PDF URL that ingestion cannot parse. Anything else goes in by its PDF URL.
+    """
+    if candidate.arxiv_id:
+        return f"https://arxiv.org/abs/{candidate.arxiv_id}"
+    biorxiv_url = candidate.pdf_url or candidate.landing_url or ""
+    if candidate.doi and candidate.doi.startswith("10.1101/") and is_biorxiv_url(biorxiv_url):
+        return canonical_biorxiv_url(candidate.doi, None)
+    return candidate.pdf_url or ""
 
 
 def _mark_import_failed(item: ReadingListItem) -> None:
