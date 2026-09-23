@@ -6,6 +6,8 @@
   <div class="item-body">
     {% if item.paper_id %}
     <a class="item-title" href="/paper.html?id={{ item.paper_id }}">{{ item.title }}</a>
+    {% elif item.url %}
+    <a class="item-title" href="{{ item.url }}" target="_blank" rel="noopener noreferrer">{{ item.title }} ↗</a>
     {% else %}
     <div class="item-title">{{ item.title }}</div>
     {% endif %}

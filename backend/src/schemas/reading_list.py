@@ -33,6 +33,15 @@ class ListSummary(BaseModel):
     progress: ListProgress
 
 
+class LookupStatus(BaseModel):
+    """Lookup progress for one list, for the list page's controls."""
+
+    running: bool
+    looked_up: int
+    unlooked: int
+    pending_review: int
+
+
 # How a lookup ended for one item.
 Outcome = Literal["in_library", "free_pdf", "record_only", "not_found"]
 

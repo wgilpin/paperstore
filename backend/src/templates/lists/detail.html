@@ -20,17 +20,7 @@
 </div>
 {% else %}
 {% include "lists/_progress.html" %}
-<div class="actions">
-  {% if pending_review %}
-  <a class="btn" href="/lists/{{ reading_list.id }}/review">Review matches ({{ pending_review }})</a>
-  {% elif unlooked %}
-  <form method="post" action="/lists/{{ reading_list.id }}/find"
-        hx-post="/lists/{{ reading_list.id }}/find" hx-disabled-elt="find button">
-    <button class="btn btn-plain" type="submit">Find papers ({{ unlooked }})</button>
-    <span class="htmx-indicator">Looking up…</span>
-  </form>
-  {% endif %}
-</div>
+{% include "lists/_lookup_status.html" %}
 {% endif %}
 <ol class="item-list">
   {% for item in reading_list.items %}

@@ -14,7 +14,7 @@ from starlette.responses import Response
 
 from src.db import get_session
 from src.services.reading_list_parser import ReadingListParser
-from src.services.reading_lists import ReadingListService
+from src.services.reading_lists import ReadingListService, start_lookup
 
 templates = Jinja2Templates(directory=str(pathlib.Path(__file__).parent.parent / "templates"))
 
@@ -53,6 +53,8 @@ def create_list(
     reading_list = ReadingListService().create_list(
         name.strip() or "Untitled list", raw_text, items, db
     )
+    if items:
+        start_lookup(reading_list.id)
     return _redirect(request, f"/lists/{reading_list.id}")
 
 
@@ -69,10 +71,8 @@ def list_detail(
         {
             "reading_list": reading_list,
             "progress": service.progress(reading_list),
-            "pending_review": len(service.review_items(reading_list)),
-            "unlooked": sum(
-                1 for i in reading_list.items if i.status == "new" and i.paper_id is None
-            ),
+            "status": service.lookup_status(reading_list),
+            "list_id": reading_list.id,
         },
     )
 
@@ -123,6 +123,8 @@ def parse_list_again(
     reading_list = service.get_list(list_id, db)
     items = ReadingListParser().parse(reading_list.raw_text)
     service.parse_again(list_id, items, db)
+    if items:
+        start_lookup(list_id)
     return _redirect(request, f"/lists/{list_id}")
 
 
@@ -139,9 +141,24 @@ _OUTCOME_LABELS = {
 def find_papers(
     request: Request, list_id: uuid.UUID, db: Session = Depends(get_session)
 ) -> Response:
-    """Look up the list's unlinked items, then open the review page."""
-    ReadingListService().find_papers(list_id, db)
-    return _redirect(request, f"/lists/{list_id}/review")
+    """Start the background lookup of the list's unlinked items, and reload the list."""
+    ReadingListService().get_list(list_id, db)  # 404 for an unknown list
+    start_lookup(list_id)
+    return _redirect(request, f"/lists/{list_id}")
+
+
+@router.get("/{list_id}/lookup-status", response_class=HTMLResponse)
+def lookup_status(
+    request: Request, list_id: uuid.UUID, db: Session = Depends(get_session)
+) -> HTMLResponse:
+    """The list page's lookup controls; polled every 2 seconds while a lookup runs."""
+    service = ReadingListService()
+    reading_list = service.get_list(list_id, db)
+    return templates.TemplateResponse(
+        request,
+        "lists/_lookup_status.html",
+        {"status": service.lookup_status(reading_list), "list_id": list_id},
+    )
 
 
 @router.get("/{list_id}/review", response_class=HTMLResponse)
