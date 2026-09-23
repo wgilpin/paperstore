@@ -216,7 +216,9 @@ class ReadingListService:
             item.paper_id = uuid.UUID(exc.paper_id)
         else:
             item.paper_id = paper.id
-            doi = _doi_of(item.url)
+            # The DOI from a doi.org link, else the one a lookup found (a failed import).
+            candidate = item.candidate
+            doi = _doi_of(item.url) or (candidate.doi if candidate else None)
             if doi and paper.doi is None and library_by_doi(doi, db) is None:
                 paper.doi = doi
         item.candidate = None

@@ -750,3 +750,23 @@ class TestItemActions:
         with pytest.raises(ValueError):
             ReadingListService().retry_import(list_id, item.id, db)
         assert item.status == "done"
+
+
+class TestUploadAfterFailedImport:
+    @patch(f"{_SVC}.library_by_doi", return_value=None)
+    def test_upload_on_failed_import_links_and_uses_candidate_doi(self, by_doi: MagicMock) -> None:
+        item = _importing_item(_free_pdf_candidate())
+        item.status = "import_failed"
+        item.url = "https://example.org/memorizing"  # the kept landing page, not a DOI
+        paper = Paper(id=uuid.uuid4(), title="Memorizing Transformers")
+        db = MagicMock()
+        db.get.return_value = item
+
+        ReadingListService().upload_pdf(
+            item.list_id, item.id, _PDF, "wu.pdf", db, _FakeLocalIngestion(paper)
+        )
+
+        assert item.paper_id == paper.id
+        assert item.status == "done"
+        assert item.candidate is None
+        assert paper.doi == "10.48550/arxiv.2203.08913"

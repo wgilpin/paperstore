@@ -21,44 +21,53 @@
     {% if item.note %}<div class="item-note">{{ item.note }}</div>{% endif %}
     {% if error %}<div class="item-error">{{ error }}</div>{% endif %}
     <div class="item-actions">
-      {% if not item.paper_id and item.url and item.status == "done" %}
+      {% if not item.paper_id and item.url and item.status in ("done", "import_failed") %}
       <form hx-post="/lists/{{ item.list_id }}/items/{{ item.id }}/upload"
             hx-encoding="multipart/form-data" hx-trigger="change"
-            hx-target="#item-{{ item.id }}" hx-swap="outerHTML">
+            hx-target="#item-{{ item.id }}" hx-swap="outerHTML"
+            hx-indicator="#busy-{{ item.id }}-upload">
         <label class="btn-link">Upload PDF
           <input type="file" name="file" accept="application/pdf,.pdf" hidden />
         </label>
-        <span class="htmx-indicator">Uploading…</span>
       </form>
       {% endif %}
       {% if item.paper_id %}
       <button class="btn-link" type="button"
               hx-post="/lists/{{ item.list_id }}/items/{{ item.id }}/unlink"
               hx-target="#item-{{ item.id }}" hx-swap="outerHTML"
+              hx-indicator="#busy-{{ item.id }}-unlink"
               hx-confirm="Unlink “{{ item.title }}” from its paper? The paper stays in your library.">Unlink</button>
       {% endif %}
       {% if item.status == "import_failed" %}
       <button class="btn-link" type="button"
               hx-post="/lists/{{ item.list_id }}/items/{{ item.id }}/retry"
-              hx-target="#item-{{ item.id }}" hx-swap="outerHTML">Retry import</button>
+              hx-target="#item-{{ item.id }}" hx-swap="outerHTML"
+              hx-indicator="#busy-{{ item.id }}-retry">Retry import</button>
       {% endif %}
       {% if not item.paper_id and item.status in ("done", "import_failed") %}
       <button class="btn-link" type="button"
               hx-post="/lists/{{ item.list_id }}/items/{{ item.id }}/search"
-              hx-target="#item-{{ item.id }}" hx-swap="outerHTML">Search again</button>
+              hx-target="#item-{{ item.id }}" hx-swap="outerHTML"
+              hx-indicator="#busy-{{ item.id }}-search">Search again</button>
       {% endif %}
       {% if not item.paper_id and item.status in ("done", "import_failed", "new") %}
       <details class="add-link">
         <summary class="btn-link">{{ "Change link" if item.url else "Add link" }}</summary>
         <form hx-post="/lists/{{ item.list_id }}/items/{{ item.id }}/link"
-              hx-target="#item-{{ item.id }}" hx-swap="outerHTML" hx-disabled-elt="find button">
+              hx-target="#item-{{ item.id }}" hx-swap="outerHTML" hx-disabled-elt="find button"
+              hx-indicator="#busy-{{ item.id }}-link">
           <input type="url" name="url" required placeholder="https://…" aria-label="Link for {{ item.title }}" />
           <button class="btn btn-small" type="submit">Save</button>
-          <span class="htmx-indicator">Checking…</span>
         </form>
       </details>
       {% endif %}
     </div>
+    {# While an action runs, its line shows and the rest of the row dims (see lists.css). #}
+    <div class="item-busy htmx-indicator" id="busy-{{ item.id }}-upload">Uploading and reading the PDF…</div>
+    <div class="item-busy htmx-indicator" id="busy-{{ item.id }}-link">Checking the link…</div>
+    <div class="item-busy htmx-indicator" id="busy-{{ item.id }}-search">Starting a new search…</div>
+    <div class="item-busy htmx-indicator" id="busy-{{ item.id }}-retry">Starting the import again…</div>
+    <div class="item-busy htmx-indicator" id="busy-{{ item.id }}-unlink">Unlinking…</div>
   </div>
   <button class="btn-link" type="button" title="Drop this item from the list"
           hx-delete="/lists/{{ item.list_id }}/items/{{ item.id }}"
