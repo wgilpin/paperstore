@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from sqlalchemy import case, func, nulls_last
+from sqlalchemy import ColumnElement, case, func, nulls_last
 from sqlalchemy.orm import Session
 
 from src.models.paper import Paper
@@ -10,8 +10,18 @@ from src.models.paper_tag import paper_tags
 from src.models.tag import Tag
 
 SortField = Literal["added_at", "title", "published_date"]
+ReadFilter = Literal["read", "unread"]
 
 PAGE_SIZE = 20
+
+
+def read_filter(read: ReadFilter | None) -> ColumnElement[bool] | None:
+    """The WHERE clause for a read-state filter; None means no filter."""
+    if read == "unread":
+        return Paper.read_at.is_(None)
+    if read == "read":
+        return Paper.read_at.is_not(None)
+    return None
 
 
 class SearchService:
@@ -22,14 +32,17 @@ class SearchService:
         sort: SortField = "added_at",
         page: int = 1,
         tag: str | None = None,
+        read: ReadFilter | None = None,
     ) -> tuple[list[Paper], int]:
         """Return papers matching *query*, or all papers if query is empty.
 
         Returns (papers, total_count). When no query, sorts by *sort* field.
         When a query is present, sorts by relevance (ts_rank).
         When *tag* is set, restricts results to papers with that tag name.
+        When *read* is set, restricts results to read or unread papers.
         """
         offset = (page - 1) * PAGE_SIZE
+        read_clause = read_filter(read)
 
         if not query:
             if sort == "published_date":
@@ -39,6 +52,8 @@ class SearchService:
             else:
                 order = Paper.added_at.desc()  # type: ignore[assignment]
             base = db.query(Paper).order_by(order)
+            if read_clause is not None:
+                base = base.filter(read_clause)
             if tag:
                 base = base.filter(
                     Paper.id.in_(
@@ -94,6 +109,9 @@ class SearchService:
             .filter(Paper.search_vector.op("@@")(tsquery) | tag_match_filter)
             .order_by(*order_by_clauses)
         )
+
+        if read_clause is not None:
+            base = base.filter(read_clause)
 
         # Restrict to a specific tag if filtered
         if tag:
