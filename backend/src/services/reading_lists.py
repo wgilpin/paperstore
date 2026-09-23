@@ -6,7 +6,8 @@ from datetime import UTC, datetime
 from sqlalchemy.orm import Session
 
 from src.models.reading_list import ReadingList, ReadingListItem
-from src.schemas.reading_list import ListProgress, ListSummary, ParsedItem
+from src.schemas.reading_list import Candidate, ListProgress, ListSummary, ParsedItem
+from src.services.citation_resolver import CitationResolver
 from src.services.notes import NotFoundError
 
 
@@ -51,14 +52,48 @@ class ReadingListService:
         """
         item = self._get_item(list_id, item_id, db)
         # Naive UTC, matching the other timestamps in this database.
-        item.read_at = None if item.read_at else datetime.now(tz=UTC).replace(tzinfo=None)
+        now = datetime.now(tz=UTC).replace(tzinfo=None)
+        if item.paper is not None:
+            # A paper item's tick is the paper's shared read flag.
+            item.paper.read_at = None if item.paper.read_at else now
+        else:
+            item.read_at = None if item.read_at else now
         db.commit()
         return item
 
     def progress(self, reading_list: ReadingList) -> ListProgress:
         """Count the ticked items of *reading_list*."""
         items = reading_list.items
-        return ListProgress(read=sum(1 for i in items if i.read_at), total=len(items))
+        return ListProgress(read=sum(1 for i in items if i.is_read), total=len(items))
+
+    def find_papers(self, list_id: uuid.UUID, db: Session) -> ReadingList:
+        """Look up every item that is not linked yet and hold the results for review."""
+        reading_list = self.get_list(list_id, db)
+        resolver = CitationResolver()
+        for item in reading_list.items:
+            if item.paper_id is not None or item.status != "new":
+                continue
+            candidate = resolver.resolve(_query(item), db)
+            item.candidate = candidate
+            item.outcome = candidate.outcome if candidate else "not_found"
+            item.status = "review"
+        db.commit()
+        return reading_list
+
+    def review_items(self, reading_list: ReadingList) -> list[ReadingListItem]:
+        """The items of *reading_list* waiting for review, in list order."""
+        return [i for i in reading_list.items if i.status == "review"]
+
+    def apply_review(self, list_id: uuid.UUID, accepted: set[uuid.UUID], db: Session) -> None:
+        """Apply the review: link accepted matches; every reviewed item leaves review."""
+        reading_list = self.get_list(list_id, db)
+        for item in self.review_items(reading_list):
+            candidate = item.candidate
+            if item.id in accepted and candidate is not None:
+                _accept(item, candidate)
+            item.candidate = None
+            item.status = "done"
+        db.commit()
 
     def list_summaries(self, db: Session) -> list[ListSummary]:
         """Return every list with its progress, newest first."""
@@ -101,3 +136,20 @@ def _to_rows(items: list[ParsedItem]) -> list[ReadingListItem]:
         )
         for position, item in enumerate(items)
     ]
+
+
+def _query(item: ReadingListItem) -> ParsedItem:
+    """The lookup query for a stored item."""
+    return ParsedItem(
+        citation=item.citation,
+        title=item.title,
+        authors=list(item.authors or []),
+        year=item.year,
+        note=item.note,
+    )
+
+
+def _accept(item: ReadingListItem, candidate: Candidate) -> None:
+    """Apply an accepted match to *item*."""
+    if candidate.outcome == "in_library" and candidate.paper_id is not None:
+        item.paper_id = candidate.paper_id

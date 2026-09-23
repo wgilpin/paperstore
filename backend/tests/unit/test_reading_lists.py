@@ -6,8 +6,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from src.models.paper import Paper
 from src.models.reading_list import ReadingList, ReadingListItem
-from src.schemas.reading_list import ParsedItem
+from src.schemas.reading_list import Candidate, ParsedItem
 from src.services.notes import NotFoundError
 from src.services.reading_lists import ReadingListService
 
@@ -244,3 +245,84 @@ class TestDeleteList:
         with pytest.raises(NotFoundError):
             ReadingListService().delete_list(uuid.uuid4(), db)
         db.delete.assert_not_called()
+
+
+def _review_item(list_id: uuid.UUID, candidate: Candidate | None, outcome: str) -> ReadingListItem:
+    item = _stored_item(list_id)
+    item.id = uuid.uuid4()
+    item.status = "review"
+    item.outcome = outcome
+    item.candidate = candidate
+    return item
+
+
+def _library_candidate(paper_id: uuid.UUID) -> Candidate:
+    return Candidate(
+        source="library",
+        title="Dense Associative Memory",
+        authors=["Krotov"],
+        year=2016,
+        paper_id=paper_id,
+        confident=True,
+        outcome="in_library",
+    )
+
+
+class TestApplyReview:
+    def test_accept_library_match_links_item(self) -> None:
+        list_id, paper_id = uuid.uuid4(), uuid.uuid4()
+        item = _review_item(list_id, _library_candidate(paper_id), "in_library")
+        reading_list = ReadingList(id=list_id, name="Memory", raw_text="raw", items=[item])
+        db = MagicMock()
+        db.get.return_value = reading_list
+
+        ReadingListService().apply_review(list_id, {item.id}, db)
+
+        assert item.paper_id == paper_id
+        assert item.status == "done"
+        assert item.candidate is None
+        db.commit.assert_called_once()
+
+    def test_reject_leaves_text_item(self) -> None:
+        list_id = uuid.uuid4()
+        item = _review_item(list_id, _library_candidate(uuid.uuid4()), "in_library")
+        reading_list = ReadingList(id=list_id, name="Memory", raw_text="raw", items=[item])
+        db = MagicMock()
+        db.get.return_value = reading_list
+
+        ReadingListService().apply_review(list_id, set(), db)
+
+        assert item.paper_id is None
+        assert item.url is None
+        assert item.status == "done"
+        assert item.candidate is None
+
+
+class TestPaperItems:
+    def test_tick_paper_item_sets_paper_read_at(self) -> None:
+        list_id = uuid.uuid4()
+        paper = Paper(id=uuid.uuid4(), title="Dense Associative Memory")
+        item = _stored_item(list_id)
+        item.paper_id, item.paper = paper.id, paper
+        db = MagicMock()
+        db.get.return_value = item
+
+        ReadingListService().toggle_tick(list_id, uuid.uuid4(), db)
+        assert paper.read_at is not None
+        assert item.read_at is None
+
+        ReadingListService().toggle_tick(list_id, uuid.uuid4(), db)
+        assert paper.read_at is None
+
+    def test_progress_counts_paper_read_at(self) -> None:
+        list_id = uuid.uuid4()
+        paper = Paper(id=uuid.uuid4(), title="Read paper", read_at=datetime(2026, 9, 1))
+        paper_item = _stored_item(list_id)
+        paper_item.paper_id, paper_item.paper = paper.id, paper
+        reading_list = ReadingList(
+            name="Memory", raw_text="raw", items=[paper_item, _stored_item(list_id)]
+        )
+
+        progress = ReadingListService().progress(reading_list)
+
+        assert (progress.read, progress.total) == (1, 2)

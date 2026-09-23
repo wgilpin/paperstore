@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -30,3 +31,26 @@ class ListSummary(BaseModel):
     name: str
     created_at: datetime
     progress: ListProgress
+
+
+# How a lookup ended for one item.
+Outcome = Literal["in_library", "free_pdf", "record_only", "not_found"]
+
+
+class Candidate(BaseModel):
+    """The best match a lookup found for one list item."""
+
+    source: Literal["library", "arxiv", "openalex"]
+    title: str
+    authors: list[str]
+    year: int | None
+    arxiv_id: str | None = None
+    doi: str | None = None
+    pdf_url: str | None = None
+    landing_url: str | None = None
+    # Set when the match is a paper already in the library.
+    paper_id: uuid.UUID | None = None
+    # True when the title and the year or an author agree; only confident matches
+    # are pre-selected on the review page.
+    confident: bool
+    outcome: Outcome

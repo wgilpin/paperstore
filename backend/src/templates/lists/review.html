@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Review · {{ reading_list.name }}{% endblock %}
+{% block content %}
+<h1>Review matches</h1>
+<p class="subtle"><a href="/lists/{{ reading_list.id }}">{{ reading_list.name }}</a> · tick the matches to accept. Weak matches are not ticked.</p>
+<form method="post" action="/lists/{{ reading_list.id }}/review">
+  <ol class="item-list">
+    {% for item in items %}
+    {% set c = item.candidate %}
+    <li class="item card review-row{% if c and not c.confident %} weak{% endif %}">
+      {% if c %}
+      <input class="tick" type="checkbox" name="accept" value="{{ item.id }}"
+             aria-label="Accept the match for {{ item.title }}"{% if c.confident %} checked{% endif %} />
+      {% else %}
+      <span class="tick-spacer"></span>
+      {% endif %}
+      <div class="item-body">
+        <div class="item-title">{{ item.title }}</div>
+        <div class="item-meta">{{ item.citation }}</div>
+        {% if c %}
+        <div class="match">
+          <span class="badge badge-{{ item.outcome }}">{{ outcome_labels[item.outcome] }}</span>
+          {% if not c.confident %}<span class="badge badge-weak">Check this match</span>{% endif %}
+          <div class="match-title">{{ c.title }}</div>
+          <div class="item-meta">
+            {%- if c.authors %}{{ c.authors[:4] | join(", ") }}{% if c.authors | length > 4 %} et al.{% endif %}{% endif -%}
+            {%- if c.authors and c.year %} · {% endif -%}
+            {%- if c.year %}{{ c.year }}{% endif -%}
+          </div>
+        </div>
+        {% else %}
+        <div class="match"><span class="badge badge-not_found">{{ outcome_labels["not_found"] }}</span></div>
+        {% endif %}
+      </div>
+    </li>
+    {% endfor %}
+  </ol>
+  <div class="actions"><button class="btn" type="submit">Apply review</button></div>
+</form>
+{% endblock %}
