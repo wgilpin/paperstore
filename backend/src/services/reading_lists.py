@@ -261,6 +261,36 @@ class ReadingListService:
         db.commit()
         return []
 
+    def search_again(self, list_id: uuid.UUID, item_id: uuid.UUID, db: Session) -> None:
+        """Send an item without a paper back to lookup; the caller starts the lookup."""
+        item = self._get_item(list_id, item_id, db)
+        if item.paper_id is not None:
+            raise ValueError("This item already links to a paper. Unlink it first.")
+        item.status = "new"
+        item.outcome = None
+        item.candidate = None
+        db.commit()
+
+    def unlink(self, list_id: uuid.UUID, item_id: uuid.UUID, db: Session) -> None:
+        """Remove an item's paper link; the paper, and its read state, stay in the library."""
+        item = self._get_item(list_id, item_id, db)
+        if item.paper_id is None:
+            raise ValueError("This item has no paper to unlink.")
+        # Clear the relationship too, so the flush does not restore paper_id from it.
+        item.paper = None
+        item.paper_id = None
+        item.status = "done"
+        db.commit()
+
+    def retry_import(self, list_id: uuid.UUID, item_id: uuid.UUID, db: Session) -> list[uuid.UUID]:
+        """Queue a failed import again; return the item ID for the importer."""
+        item = self._get_item(list_id, item_id, db)
+        if item.status != "import_failed" or item.candidate is None:
+            raise ValueError("Only a failed import can be retried.")
+        item.status = "importing"
+        db.commit()
+        return [item.id]
+
     def reset_stuck_imports(self, db: Session) -> int:
         """Mark items left importing by a restart as import_failed; return how many."""
         stuck = db.query(ReadingListItem).filter(ReadingListItem.status == "importing").all()
