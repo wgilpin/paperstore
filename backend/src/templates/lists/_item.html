@@ -16,11 +16,16 @@
       {%- if item.authors and item.year %} · {% endif -%}
       {%- if item.year %}{{ item.year }}{% endif -%}
     </div>
+    {% if item.status == "new" and status and status.running %}<span class="badge badge-importing">Looking up…</span>{% endif %}
+    {% if item.status == "review" %}<span class="badge badge-weak">Waiting for review</span>{% endif %}
     {% if item.status == "importing" %}<span class="badge badge-importing">Importing…</span>{% endif %}
     {% if item.status == "import_failed" %}<span class="badge badge-failed">Import failed</span>{% endif %}
     {% if item.note %}<div class="item-note">{{ item.note }}</div>{% endif %}
     {% if error %}<div class="item-error">{{ error }}</div>{% endif %}
     <div class="item-actions">
+      {% if item.status == "review" %}
+      <a class="btn btn-small" href="/lists/{{ item.list_id }}/review">Review now</a>
+      {% endif %}
       {% if not item.paper_id and item.url and item.status in ("done", "import_failed") %}
       <form hx-post="/lists/{{ item.list_id }}/items/{{ item.id }}/upload"
             hx-encoding="multipart/form-data" hx-trigger="change"
