@@ -19,6 +19,19 @@
     {% if item.status == "importing" %}<span class="badge badge-importing">Importing…</span>{% endif %}
     {% if item.status == "import_failed" %}<span class="badge badge-failed">Import failed</span>{% endif %}
     {% if item.note %}<div class="item-note">{{ item.note }}</div>{% endif %}
+    {% if error %}<div class="item-error">{{ error }}</div>{% endif %}
+    <div class="item-actions">
+      {% if not item.paper_id and item.url and item.status == "done" %}
+      <form hx-post="/lists/{{ item.list_id }}/items/{{ item.id }}/upload"
+            hx-encoding="multipart/form-data" hx-trigger="change"
+            hx-target="#item-{{ item.id }}" hx-swap="outerHTML">
+        <label class="btn-link">Upload PDF
+          <input type="file" name="file" accept="application/pdf,.pdf" hidden />
+        </label>
+        <span class="htmx-indicator">Uploading…</span>
+      </form>
+      {% endif %}
+    </div>
   </div>
   <button class="btn-link" type="button" title="Drop this item from the list"
           hx-delete="/lists/{{ item.list_id }}/items/{{ item.id }}"

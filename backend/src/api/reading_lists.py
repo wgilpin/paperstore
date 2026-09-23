@@ -3,10 +3,11 @@
 Mounted at /lists, not under /api/, because AuthMiddleware exempts /api/.
 """
 
+import logging
 import pathlib
 import uuid
 
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -15,6 +16,8 @@ from starlette.responses import Response
 from src.db import get_session
 from src.services.reading_list_parser import ReadingListParser
 from src.services.reading_lists import ReadingListService, start_import, start_lookup
+
+logger = logging.getLogger(__name__)
 
 templates = Jinja2Templates(directory=str(pathlib.Path(__file__).parent.parent / "templates"))
 
@@ -190,3 +193,26 @@ def submit_review(
     """Apply the accepted matches, start importing free PDFs, and go back to the list."""
     start_import(ReadingListService().apply_review(list_id, set(accept), db))
     return RedirectResponse(f"/lists/{list_id}", status_code=303)
+
+
+@router.post("/{list_id}/items/{item_id}/upload", response_class=HTMLResponse)
+def upload_item_pdf(
+    request: Request,
+    list_id: uuid.UUID,
+    item_id: uuid.UUID,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_session),
+) -> HTMLResponse:
+    """Ingest an uploaded PDF for an item and link it; show any error in the item row."""
+    service = ReadingListService()
+    error: str | None = None
+    try:
+        service.upload_pdf(list_id, item_id, file.file.read(), file.filename or "upload.pdf", db)
+    except ValueError as exc:
+        error = str(exc)
+    except Exception:
+        db.rollback()
+        logger.exception("PDF upload failed for reading list item %s", item_id)
+        error = "The upload failed. Try again."
+    item = service.get_item(list_id, item_id, db)
+    return templates.TemplateResponse(request, "lists/_item.html", {"item": item, "error": error})

@@ -4,6 +4,7 @@ import logging
 import threading
 import uuid
 from datetime import UTC, datetime
+from pathlib import Path
 
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -182,6 +183,45 @@ class ReadingListService:
             item.status = "done"
         db.commit()
 
+    def upload_pdf(
+        self,
+        list_id: uuid.UUID,
+        item_id: uuid.UUID,
+        pdf_bytes: bytes,
+        filename: str,
+        db: Session,
+        ingestion: IngestionService | None = None,
+    ) -> ReadingListItem:
+        """Ingest an uploaded PDF for an item without a paper, and link the paper.
+
+        The item's link (usually its DOI) is the paper's source URL. A duplicate links
+        the existing paper. Raises ValueError for a linked item or bytes that are not
+        a PDF; the item is then unchanged.
+        """
+        item = self._get_item(list_id, item_id, db)
+        if item.paper_id is not None:
+            raise ValueError("This item already links to a paper.")
+        if not pdf_bytes.startswith(b"%PDF"):
+            raise ValueError("That file is not a PDF.")
+        try:
+            paper = (ingestion or IngestionService()).ingest_local(
+                pdf_bytes=pdf_bytes, local_path=Path(filename), db=db, source_url=item.url
+            )
+        except DuplicateError as exc:
+            db.rollback()
+            if not exc.paper_id:
+                raise ValueError(str(exc)) from exc
+            item.paper_id = uuid.UUID(exc.paper_id)
+        else:
+            item.paper_id = paper.id
+            doi = _doi_of(item.url)
+            if doi and paper.doi is None and library_by_doi(doi, db) is None:
+                paper.doi = doi
+        item.candidate = None
+        item.status = "done"
+        db.commit()
+        return item
+
     def reset_stuck_imports(self, db: Session) -> int:
         """Mark items left importing by a restart as import_failed; return how many."""
         stuck = db.query(ReadingListItem).filter(ReadingListItem.status == "importing").all()
@@ -209,6 +249,10 @@ class ReadingListService:
         """Delete a list; the database cascade deletes its items."""
         db.delete(self.get_list(list_id, db))
         db.commit()
+
+    def get_item(self, list_id: uuid.UUID, item_id: uuid.UUID, db: Session) -> ReadingListItem:
+        """Return the item; raise NotFoundError if absent or on another list."""
+        return self._get_item(list_id, item_id, db)
 
     def _get_item(self, list_id: uuid.UUID, item_id: uuid.UUID, db: Session) -> ReadingListItem:
         """Return the item; raise NotFoundError if absent or on another list."""
@@ -252,6 +296,14 @@ def _accept(item: ReadingListItem, candidate: Candidate) -> None:
         item.url = candidate.landing_url or (
             f"https://doi.org/{candidate.doi}" if candidate.doi else None
         )
+
+
+def _doi_of(url: str | None) -> str | None:
+    """The DOI in a https://doi.org/ link, lower case; None for any other URL."""
+    prefix = "https://doi.org/"
+    if url and url.lower().startswith(prefix):
+        return url[len(prefix) :].lower() or None
+    return None
 
 
 def _mark_import_failed(item: ReadingListItem) -> None:
