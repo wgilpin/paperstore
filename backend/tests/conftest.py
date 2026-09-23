@@ -4,6 +4,15 @@ from unittest.mock import MagicMock
 
 import pytest
 
+# Import every model so SQLAlchemy can configure its mappers in any test order.
+import src.models.batch_job  # noqa: F401
+import src.models.note  # noqa: F401
+import src.models.paper  # noqa: F401
+import src.models.paper_tag  # noqa: F401
+import src.models.reading_list  # noqa: F401
+import src.models.setting  # noqa: F401
+import src.models.tag  # noqa: F401
+
 
 @pytest.fixture()
 def db_session() -> MagicMock:

@@ -25,3 +25,5 @@ h1 { font-size: 1.4rem; color: #0f172a; margin-bottom: 0.35rem; }
 .item-meta { font-size: 0.82rem; color: #64748b; margin-top: 0.2rem; }
 .item-note { font-size: 0.88rem; color: #334155; margin-top: 0.4rem; }
 .item.is-read .item-title { color: #64748b; text-decoration: line-through; }
+.progress { font-size: 0.9rem; font-weight: 600; color: #334155; margin-top: 0.5rem; }
+.tick { width: 1.15rem; height: 1.15rem; margin-top: 0.15rem; flex-shrink: 0; cursor: pointer; accent-color: #16a34a; }
