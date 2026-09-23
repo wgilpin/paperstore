@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import ARRAY, ForeignKey, String, Text, func
+from sqlalchemy import ARRAY, ForeignKey, String, Text, false, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -19,6 +19,8 @@ class ReadingList(Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     # The pasted text, kept so the list can be parsed again.
     raw_text: Mapped[str] = mapped_column(Text, nullable=False)
+    # True when the last parse found no items; the page then offers "parse again".
+    parse_failed: Mapped[bool] = mapped_column(nullable=False, server_default=false())
     created_at: Mapped[datetime] = mapped_column(nullable=False, server_default=func.now())
 
     items: Mapped[list[ReadingListItem]] = relationship(

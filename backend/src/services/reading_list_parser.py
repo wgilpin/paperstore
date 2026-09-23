@@ -5,7 +5,7 @@ import os
 
 from google import genai
 from google.genai import types
-from pydantic import TypeAdapter
+from pydantic import TypeAdapter, ValidationError
 
 from src.schemas.reading_list import ParsedItem
 
@@ -33,7 +33,7 @@ class ReadingListParser:
     """Calls Gemini to split a pasted reading list into ParsedItems."""
 
     def parse(self, text: str) -> list[ParsedItem]:
-        """Return the items of *text* in list order.
+        """Return the items of *text* in list order, or [] if parsing fails.
 
         Raises ValueError if GEMINI_API_KEY or GEMINI_PDF_MODEL is not set.
         """
@@ -46,14 +46,23 @@ class ReadingListParser:
 
         client = genai.Client(api_key=api_key)
         # Structured output: Gemini returns a JSON array matching ParsedItem.
-        response = client.models.generate_content(
-            model=model_name,
-            contents=_PROMPT + text,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=list[ParsedItem],
-            ),
-        )
-        items = _ITEMS.validate_json(response.text or "[]")
+        # Any failure here gives an empty list, so the caller saves the raw text
+        # and offers "parse again" instead of losing the paste.
+        try:
+            response = client.models.generate_content(
+                model=model_name,
+                contents=_PROMPT + text,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    response_schema=list[ParsedItem],
+                ),
+            )
+            items = _ITEMS.validate_json(response.text or "[]")
+        except ValidationError:
+            logger.warning("Gemini returned a reading list that does not match the schema")
+            return []
+        except Exception:
+            logger.exception("Gemini call for reading list parsing failed")
+            return []
         logger.info("parsed reading list into %d item(s)", len(items))
         return items

@@ -40,6 +40,51 @@ class TestCreateList:
         assert result.items[2].year is None
 
 
+class TestCreateListParseFailed:
+    def test_create_list_with_no_items_marks_parse_failed(self) -> None:
+        db = MagicMock()
+
+        result = ReadingListService().create_list("Memory", "raw pasted text", [], db)
+
+        db.add.assert_called_once_with(result)
+        assert result.raw_text == "raw pasted text"
+        assert result.items == []
+        assert result.parse_failed is True
+
+    def test_create_list_with_items_is_not_marked_parse_failed(self) -> None:
+        db = MagicMock()
+
+        result = ReadingListService().create_list("Memory", "raw", [_item("First")], db)
+
+        assert result.parse_failed is False
+
+
+class TestParseAgain:
+    def test_parse_again_replaces_items(self) -> None:
+        stored = ReadingList(name="Memory", raw_text="raw", parse_failed=True, items=[])
+        db = MagicMock()
+        db.get.return_value = stored
+
+        result = ReadingListService().parse_again(
+            uuid.uuid4(), [_item("First"), _item("Second")], db
+        )
+
+        assert result is stored
+        assert [(i.position, i.title) for i in stored.items] == [(0, "First"), (1, "Second")]
+        assert stored.parse_failed is False
+        db.commit.assert_called_once()
+
+    def test_parse_again_with_no_items_keeps_parse_failed(self) -> None:
+        stored = ReadingList(name="Memory", raw_text="raw", parse_failed=True, items=[])
+        db = MagicMock()
+        db.get.return_value = stored
+
+        ReadingListService().parse_again(uuid.uuid4(), [], db)
+
+        assert stored.items == []
+        assert stored.parse_failed is True
+
+
 class TestGetList:
     def test_get_list_returns_the_list(self) -> None:
         db = MagicMock()

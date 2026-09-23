@@ -105,3 +105,15 @@ def delete_list(list_id: uuid.UUID, db: Session = Depends(get_session)) -> Respo
     """Delete a list and its items, then send the browser to the lists index."""
     ReadingListService().delete_list(list_id, db)
     return Response(status_code=204, headers={"HX-Redirect": "/lists"})
+
+
+@router.post("/{list_id}/parse")
+def parse_list_again(
+    request: Request, list_id: uuid.UUID, db: Session = Depends(get_session)
+) -> Response:
+    """Parse a list's saved raw text again, then reload its page."""
+    service = ReadingListService()
+    reading_list = service.get_list(list_id, db)
+    items = ReadingListParser().parse(reading_list.raw_text)
+    service.parse_again(list_id, items, db)
+    return _redirect(request, f"/lists/{list_id}")

@@ -14,23 +14,26 @@ class ReadingListService:
     def create_list(
         self, name: str, raw_text: str, items: list[ParsedItem], db: Session
     ) -> ReadingList:
-        """Save a list named *name* with *items* in the given order."""
+        """Save a list named *name* with *items* in the given order.
+
+        With no items, the list is saved with its raw text and marked parse_failed.
+        """
         reading_list = ReadingList(
             name=name,
             raw_text=raw_text,
-            items=[
-                ReadingListItem(
-                    position=position,
-                    citation=item.citation,
-                    title=item.title,
-                    authors=item.authors,
-                    year=item.year,
-                    note=item.note,
-                )
-                for position, item in enumerate(items)
-            ],
+            parse_failed=not items,
+            items=_to_rows(items),
         )
         db.add(reading_list)
+        db.commit()
+        return reading_list
+
+    def parse_again(self, list_id: uuid.UUID, items: list[ParsedItem], db: Session) -> ReadingList:
+        """Replace a list's items with a new parse; clear parse_failed when items were found."""
+        reading_list = self.get_list(list_id, db)
+        if items:
+            reading_list.items = _to_rows(items)
+            reading_list.parse_failed = False
         db.commit()
         return reading_list
 
@@ -83,3 +86,18 @@ class ReadingListService:
         if item is None or item.list_id != list_id:
             raise NotFoundError(f"Item {item_id} not found in reading list {list_id}")
         return item
+
+
+def _to_rows(items: list[ParsedItem]) -> list[ReadingListItem]:
+    """Turn parsed items into item rows, numbered in list order."""
+    return [
+        ReadingListItem(
+            position=position,
+            citation=item.citation,
+            title=item.title,
+            authors=item.authors,
+            year=item.year,
+            note=item.note,
+        )
+        for position, item in enumerate(items)
+    ]

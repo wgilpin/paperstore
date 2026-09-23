@@ -27,8 +27,8 @@ Updated: 2026-09-23
   - [x] epic-01-safe-database — merged 2026-09-23
   - [x] epic-02-paste-to-list — merged 2026-09-23
   - [x] epic-03-tick-items — merged 2026-09-23
-  - [x] epic-04-manage-lists — reviewed 2026-09-23
-  - [ ] epic-05-parse-again — pending
+  - [x] epic-04-manage-lists — merged 2026-09-23
+  - [x] epic-05-parse-again — reviewed 2026-09-23
 - [ ] 02-find-and-import — pending
 - [ ] 03-manual-paths — pending
 - [ ] 04-mvp-test — pending
