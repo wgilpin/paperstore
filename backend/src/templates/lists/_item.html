@@ -1,0 +1,11 @@
+<li class="item card{% if item.read_at %} is-read{% endif %}" id="item-{{ item.id }}">
+  <div class="item-body">
+    <div class="item-title">{{ item.title }}</div>
+    <div class="item-meta">
+      {%- if item.authors %}{{ item.authors | join(", ") }}{% endif -%}
+      {%- if item.authors and item.year %} · {% endif -%}
+      {%- if item.year %}{{ item.year }}{% endif -%}
+    </div>
+    {% if item.note %}<div class="item-note">{{ item.note }}</div>{% endif %}
+  </div>
+</li>

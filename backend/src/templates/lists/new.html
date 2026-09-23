@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}New reading list{% endblock %}
+{% block content %}
+<h1>New reading list</h1>
+<p class="subtle">Paste a reading list from an LLM chat. It is split into items in the same order.</p>
+<form class="card" style="margin-top: 1rem" method="post" action="/lists"
+      hx-post="/lists" hx-disabled-elt="button">
+  <div class="form-row">
+    <label for="name">Name</label>
+    <input id="name" name="name" required maxlength="200" placeholder="Memory for LLMs" />
+  </div>
+  <div class="form-row">
+    <label for="raw_text">Reading list</label>
+    <textarea id="raw_text" name="raw_text" required></textarea>
+  </div>
+  <button class="btn" type="submit">Create list</button>
+  <span class="htmx-indicator">Reading the list…</span>
+</form>
+{% endblock %}

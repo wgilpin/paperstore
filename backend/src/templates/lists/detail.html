@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}{{ reading_list.name }}{% endblock %}
+{% block content %}
+<h1>{{ reading_list.name }}</h1>
+<p class="subtle">{{ reading_list.items | length }} items · created {{ reading_list.created_at.strftime("%d %b %Y") }}</p>
+<ol class="item-list">
+  {% for item in reading_list.items %}
+    {% include "lists/_item.html" %}
+  {% endfor %}
+</ol>
+{% endblock %}
