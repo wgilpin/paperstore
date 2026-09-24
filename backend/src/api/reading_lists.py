@@ -113,6 +113,18 @@ def drop_item(
     return templates.TemplateResponse(request, "lists/_drop.html", {"progress": progress})
 
 
+@router.post("/{list_id}/name")
+def rename_list(
+    request: Request,
+    list_id: uuid.UUID,
+    name: str = Form(...),
+    db: Session = Depends(get_session),
+) -> Response:
+    """Rename a list, then reload its page."""
+    ReadingListService().rename_list(list_id, name, db)
+    return _redirect(request, f"/lists/{list_id}")
+
+
 @router.delete("/{list_id}")
 def delete_list(list_id: uuid.UUID, db: Session = Depends(get_session)) -> Response:
     """Delete a list and its items, then send the browser to the lists index."""

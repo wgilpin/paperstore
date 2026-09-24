@@ -21,7 +21,7 @@ Release 1 must not block Release 2. Both use one library, and a list item links 
 - Creating a list directly from a chat. Paste is enough for occasional use.
 - A checklist on the phone. The phone stays a share target for adding papers.
 - Per-list read state for papers.
-- List editing beyond drop item and delete list (no add, reorder or archive).
+- List editing beyond rename, drop item and delete list (no add, reorder or archive). Rename added by ISS-15.
 - No change to the current paper submission, search, tags, notes, or Drive storage.
 
 ## Open questions

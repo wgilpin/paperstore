@@ -114,3 +114,11 @@ Found in the production log. The Dockerfile `CMD` runs `uv run` without `--no-de
 **Lands in:** unplanned
 
 `prod.sh` calls `/tags`, which returns 307 to the login page, and `urlopen` follows it. Any running server passes, even with broken routes. Check an auth-exempt route that exercises the app, or treat a redirect as a failure.
+
+## ISS-15 — A user cannot rename a reading list after creating it
+
+**Raised:** 2026-09-24
+**Status:** fixed 2026-09-24
+**Lands in:** fixed on main
+
+`concept.md` and phase 01 epic-04-manage-lists put rename out of scope, so no route existed. Will reported it on 2026-09-24 and chose to build it now, without a full `/sdlc:concept` pass. `concept.md` Out of scope now allows rename. Proved by `TestRenameList` in `backend/tests/unit/test_reading_lists.py`.

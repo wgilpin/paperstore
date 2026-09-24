@@ -3,6 +3,14 @@
 {% block content %}
 <div class="heading-row">
   <h1>{{ reading_list.name }}</h1>
+  <details class="add-link">
+    <summary class="btn-link">Rename</summary>
+    <form method="post" action="/lists/{{ reading_list.id }}/name"
+          hx-post="/lists/{{ reading_list.id }}/name" hx-disabled-elt="find button">
+      <input name="name" required maxlength="200" value="{{ reading_list.name }}" aria-label="List name" />
+      <button class="btn btn-small" type="submit">Save</button>
+    </form>
+  </details>
   <button class="btn-link danger" type="button"
           hx-delete="/lists/{{ reading_list.id }}"
           hx-confirm="Delete the list “{{ reading_list.name }}”? Papers in your library are not affected.">Delete list</button>

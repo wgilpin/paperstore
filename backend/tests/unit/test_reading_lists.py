@@ -248,6 +248,28 @@ class TestDeleteList:
         db.delete.assert_not_called()
 
 
+class TestRenameList:
+    def test_rename_list_sets_trimmed_name(self) -> None:
+        stored = ReadingList(name="Memory", raw_text="raw")
+        db = MagicMock()
+        db.get.return_value = stored
+
+        ReadingListService().rename_list(uuid.uuid4(), "  Memory papers  ", db)
+
+        assert stored.name == "Memory papers"
+        db.commit.assert_called_once()
+
+    def test_rename_list_blank_name_keeps_old_name(self) -> None:
+        stored = ReadingList(name="Memory", raw_text="raw")
+        db = MagicMock()
+        db.get.return_value = stored
+
+        ReadingListService().rename_list(uuid.uuid4(), "   ", db)
+
+        assert stored.name == "Memory"
+        db.commit.assert_not_called()
+
+
 def _review_item(list_id: uuid.UUID, candidate: Candidate | None, outcome: str) -> ReadingListItem:
     item = _stored_item(list_id)
     item.id = uuid.uuid4()

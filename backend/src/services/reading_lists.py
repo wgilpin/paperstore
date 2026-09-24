@@ -312,6 +312,14 @@ class ReadingListService:
         db.delete(self._get_item(list_id, item_id, db))
         db.commit()
 
+    def rename_list(self, list_id: uuid.UUID, name: str, db: Session) -> ReadingList:
+        """Set the list's name to *name*, trimmed; a blank name keeps the old one."""
+        reading_list = self.get_list(list_id, db)
+        if name.strip():
+            reading_list.name = name.strip()
+            db.commit()
+        return reading_list
+
     def delete_list(self, list_id: uuid.UUID, db: Session) -> None:
         """Delete a list; the database cascade deletes its items."""
         db.delete(self.get_list(list_id, db))
