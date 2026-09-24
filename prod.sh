@@ -11,6 +11,29 @@ export PATH="/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin:$HOME/.orbstack/bin:
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+# --- BEGIN deploy guard ---
+# Deploy only what is on GitHub: main, clean, and identical to origin/main.
+# The image is built from this working tree, so anything else would ship code
+# that matches no pushed commit.
+if [ "$(git rev-parse --abbrev-ref HEAD)" != "main" ]; then
+    echo "Error: not on main (on $(git rev-parse --abbrev-ref HEAD)). Check out main first."
+    exit 1
+fi
+if [ -n "$(git status --porcelain)" ]; then
+    echo "Error: the working tree has uncommitted changes. Commit or stash them first:"
+    git status --short
+    exit 1
+fi
+git fetch --quiet origin main
+if [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]; then
+    echo "Error: main differs from origin/main. Push or pull first:"
+    echo "  unpushed: $(git rev-list --count origin/main..HEAD) commit(s), unpulled: $(git rev-list --count HEAD..origin/main) commit(s)"
+    exit 1
+fi
+DEPLOY_SHA="$(git rev-parse --short HEAD)"
+echo "Deploying commit $DEPLOY_SHA: $(git log -1 --format=%s)"
+# --- END deploy guard ---
+
 # 3. Pre-flight check: Verify Docker (OrbStack) is running
 if ! docker info >/dev/null 2>&1; then
     echo "Error: Docker (OrbStack) is not running. Please start OrbStack first."
@@ -48,7 +71,7 @@ while [ $attempt -le $max_attempts ]; do
 done
 
 if [ "$success" = true ]; then
-    echo "=== Production deploy completed successfully! ==="
+    echo "=== Production deploy of $DEPLOY_SHA completed successfully! ==="
     echo "API is healthy and online."
 else
     echo "Warning: API container started but failed the health check."
