@@ -58,7 +58,7 @@ class SummaryService:
 
         model_name = os.environ.get("GEMINI_PDF_MODEL", "").strip()
         if not model_name or model_name == "gemini-2.0-flash":
-            model_name = "gemini-2.5-flash"
+            model_name = "gemini-3.8-flash"
 
         client = genai.Client(api_key=api_key)
 
