@@ -2,7 +2,7 @@
 
 import logging
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from src.db import get_session
@@ -14,14 +14,20 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.get("/settings", response_model=SettingsSchema)
+def _require_auth(request: Request) -> None:
+    """Require an authenticated user session."""
+    if not request.session.get("authenticated"):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+
+@router.get("/settings", response_model=SettingsSchema, dependencies=[Depends(_require_auth)])
 def get_settings(db: Session = Depends(get_session)) -> SettingsSchema:
     """Get all settings."""
     about_me = db.query(Setting).filter(Setting.key == "about_me").first()
     return SettingsSchema(about_me=about_me.value if about_me else "")
 
 
-@router.put("/settings", response_model=SettingsSchema)
+@router.put("/settings", response_model=SettingsSchema, dependencies=[Depends(_require_auth)])
 def update_settings(
     body: SettingsSchema,
     db: Session = Depends(get_session),

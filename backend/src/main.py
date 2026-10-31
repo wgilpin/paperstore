@@ -44,17 +44,28 @@ app = FastAPI(title="PaperStore")
 
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=["*"])
 
-# Allow the Chrome extension (chrome-extension://*) and local dev front end.
+_cors_origins = [
+    origin.strip()
+    for origin in os.environ.get(
+        "CORS_ORIGINS", os.environ.get("GOOGLE_JS_ORIGIN", "http://localhost:8000")
+    ).split(",")
+    if origin.strip()
+]
+
+# Allow configured web origins and the Chrome extension (chrome-extension://<32-char-id>).
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Tightened in production; prototype uses wildcard.
+    allow_origins=_cors_origins,
+    allow_origin_regex=r"^chrome-extension://[a-p]{32}$",
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 _AUTH_EXEMPT_PREFIXES = (
     "/auth/",
-    "/api/",
+    "/api/recent",
+    "/api/search",
     "/manifest.json",
     "/service-worker.js",
     "/papers/receive-share",
@@ -194,9 +205,12 @@ async def _global_exception_handler(request: Request, exc: Exception) -> JSONRes
             status_code=502,
             content=ErrorResponse(error="drive_upload_error", detail=str(exc)).model_dump(),
         )
+    logger.exception("Unhandled exception on %s %s", request.method, request.url.path)
     return JSONResponse(
         status_code=500,
-        content=ErrorResponse(error="internal_error", detail=str(exc)).model_dump(),
+        content=ErrorResponse(
+            error="internal_error", detail="Internal server error"
+        ).model_dump(),
     )
 
 
