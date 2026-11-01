@@ -5,9 +5,7 @@ services:
     environment:
       POSTGRES_DB: paperstore
       POSTGRES_USER: paperstore
-      POSTGRES_PASSWORD: paperstore
-    ports:
-      - "5433:5432"
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
@@ -16,6 +14,10 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     restart: unless-stopped
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     expose:
       - "8000"
     env_file:
@@ -28,17 +30,14 @@ services:
     depends_on:
       - db
     environment:
-      DATABASE_URL: postgresql://paperstore:paperstore@db:5432/paperstore
+      DATABASE_URL: postgresql://paperstore:${POSTGRES_PASSWORD}@db:5432/paperstore
       GOOGLE_CREDENTIALS_PATH: /run/secrets/paperstore-credentials.json
       GOOGLE_TOKEN_PATH: /var/lib/paperstore/token/token.json
     networks:
-      - gateway_net
       - web-routing
       - default
 
 networks:
-  gateway_net:
-    external: true
   web-routing:
     external: true
 

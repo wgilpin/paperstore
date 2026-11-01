@@ -51,4 +51,5 @@ docker-compose.override.yml
 *.log
 /.env
 /paperstore_dump.sql
+/backup-pre-hardening.sql
 partial_restore.sql

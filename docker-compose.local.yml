@@ -1,12 +1,12 @@
 services:
   db:
     ports: !override
-      - "5434:5432"
+      - "127.0.0.1:5434:5432"
 
   api:
     command: ["uv", "run", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     environment:
       # Dev uses its own db container (host port 5434), never the production database.
       DATABASE_URL: postgresql://paperstore:paperstore@db:5432/paperstore
